@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import type { Product, FulfillmentType } from '../types'
-import { productApi, rentalApi, messageApi } from '@/lib/api'
-import { Button, Card, Input } from '@/components/ui'
-import { DatePicker, FulfillmentSelector } from '@/components'
+import { productApi, rentalApi, messageApi } from '../lib/api'
+import { Button, Card, Input } from '../components/ui'
+import { DatePicker, FulfillmentSelector } from '../components'
 
 export default function RentalDetail() {
   const { slug } = useParams<{ slug: string }>()

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import type { Product, CartItem } from '../types'
-import { productApi, shopApi } from '@/lib/api'
-import { Button, Card, Input } from '@/components/ui'
+import { productApi, shopApi } from '../lib/api'
+import { Button, Card, Input } from '../components/ui'
 
 export default function ShopDetail() {
   const { slug } = useParams<{ slug: string }>()
