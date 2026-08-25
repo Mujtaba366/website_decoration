@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\OEM\\\\OneDrive\\\\Desktop\\\\Projects\\\\family_projects\\\\Aziza\\\\business_website\" -Force)",
+      "Bash(Select-Object Name, PSIsContainer)",
+      "PowerShell(head -30)",
+      "Bash(git init *)",
+      "Bash(git config *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ]
+  }
+}
