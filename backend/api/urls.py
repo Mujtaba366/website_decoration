@@ -2,34 +2,26 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    # Auth endpoints
-    path('auth/session/', views.auth_session, name='auth-session'),
-    path('auth/logout/', views.auth_logout, name='auth-logout'),
+    # Product endpoints
+    path('products/', views.list_products, name='list-products'),
+    path('products/<str:product_id>/', views.product_detail, name='product-detail'),
 
-    # Company endpoints
-    path('companies/', views.list_companies, name='list-companies'),
-    path('companies/', views.create_company, name='create-company'),
-    path('companies/<str:company_id>/', views.company_detail, name='company-detail'),
-    path('companies/<str:company_id>/members/', views.company_members, name='company-members'),
+    # Rental availability endpoints
+    path('products/<str:product_id>/availability/', views.get_availability, name='get-availability'),
 
-    # Bills endpoints
-    path('companies/<str:company_id>/bills/', views.list_create_bills, name='list-create-bills'),
-    path('companies/<str:company_id>/bills/<str:bill_id>/', views.bill_detail, name='bill-detail'),
+    # Booking endpoints
+    path('bookings/', views.create_booking, name='create-booking'),
+    path('bookings/<str:booking_id>/', views.booking_detail, name='booking-detail'),
 
-    # Chart of Accounts endpoints
-    path('companies/<str:company_id>/chart-of-accounts/', views.list_create_chart_of_accounts, name='list-create-accounts'),
-    path('companies/<str:company_id>/chart-of-accounts/<str:account_id>/', views.chart_of_account_detail, name='account-detail'),
+    # Order endpoints
+    path('orders/', views.create_order, name='create-order'),
+    path('orders/<str:order_id>/', views.order_detail, name='order-detail'),
 
-    # Journal Entries endpoints
-    path('companies/<str:company_id>/journal-entries/', views.list_create_journal_entries, name='list-create-entries'),
-    path('companies/<str:company_id>/journal-entries/<str:entry_id>/', views.journal_entry_detail, name='entry-detail'),
-    path('companies/<str:company_id>/journal-entries/<str:entry_id>/post/', views.post_journal_entry, name='post-entry'),
+    # Message endpoints
+    path('messages/', views.create_message, name='create-message'),
+    path('messages/<str:related_id>/', views.list_messages, name='list-messages'),
 
-    # Items endpoints
-    path('companies/<str:company_id>/items/', views.list_create_items, name='list-create-items'),
-    path('companies/<str:company_id>/items/<str:item_id>/', views.item_detail, name='item-detail'),
-
-    # Tax Rates endpoints
-    path('companies/<str:company_id>/tax-rates/', views.list_create_tax_rates, name='list-create-tax-rates'),
-    path('companies/<str:company_id>/tax-rates/<str:rate_id>/', views.tax_rate_detail, name='tax-rate-detail'),
+    # Payment endpoints
+    path('payments/', views.create_payment, name='create-payment'),
+    path('payments/<str:payment_id>/', views.payment_detail, name='payment-detail'),
 ]

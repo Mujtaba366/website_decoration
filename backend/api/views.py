@@ -2,22 +2,18 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from functools import wraps
-from api.supabase_client import (
-    supabase,
-    user_is_member_of_company,
-    get_user_companies,
-)
+from api.supabase_client import supabase
 import json
+from datetime import datetime, timedelta
 
-TABLE_USERS = 'users'
-TABLE_COMPANIES = 'companies'
-TABLE_COMPANY_MEMBERS = 'company_members'
-TABLE_BILLS = 'bills'
-TABLE_PURCHASE_ORDERS = 'purchase_orders'
-TABLE_CHART_OF_ACCOUNTS = 'chart_of_accounts'
-TABLE_JOURNAL_ENTRIES = 'journal_entries'
-TABLE_TAX_RATES = 'tax_rates'
-TABLE_ITEMS = 'items'
+TABLE_PRODUCTS = 'products'
+TABLE_BOOKINGS = 'bookings'
+TABLE_ORDERS = 'orders'
+TABLE_MESSAGES = 'messages'
+TABLE_PAYMENTS = 'payments'
+TABLE_RENTAL_AVAILABILITY = 'rental_availability'
+
+AUCKLAND_SUBURBS = ['Auckland', 'North Shore', 'Waitakere', 'Manukau', 'Papakura', 'Kumeu']
 
 def _response(data=None, error=None, status=200):
     """Standard API response format"""
@@ -25,390 +21,218 @@ def _response(data=None, error=None, status=200):
         return JsonResponse({'error': error}, status=status)
     return JsonResponse({'data': data} if data is not None else {}, status=status)
 
-def _require_user(view_func):
-    """Decorator to require authentication"""
-    @wraps(view_func)
-    def wrapper(request, *args, **kwargs):
-        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
-        if not auth_header.startswith('Bearer '):
-            return _response(error='Unauthorized', status=401)
-
-        token = auth_header[7:]
-        try:
-            user = supabase.auth.get_user(token)
-            request.user_id = user.user.id if user and user.user else None
-            if not request.user_id:
-                return _response(error='Invalid token', status=401)
-        except Exception:
-            return _response(error='Invalid token', status=401)
-
-        return view_func(request, *args, **kwargs)
-    return wrapper
-
-def _user_is_member_of_company(request, company_id):
-    """Check if user has access to company"""
-    if not hasattr(request, 'user_id'):
+def is_within_auckland(address):
+    """Check if address is within Auckland"""
+    if not address:
         return False
-    return user_is_member_of_company(request.user_id, company_id)
+    address_lower = address.lower()
+    return any(suburb.lower() in address_lower for suburb in AUCKLAND_SUBURBS)
 
-# Auth Endpoints
+def calculate_delivery_fee(address):
+    """Calculate delivery fee based on distance from Auckland"""
+    if is_within_auckland(address):
+        return 0
+    return 50
 
-@csrf_exempt
-@require_http_methods(['GET'])
-@_require_user
-def auth_session(request):
-    """Get current user session"""
-    try:
-        user_data = supabase.table(TABLE_USERS).select('*').eq('id', request.user_id).execute()
-        if user_data.data:
-            return _response(data=user_data.data[0])
-        return _response(error='User not found', status=404)
-    except Exception as e:
-        return _response(error=str(e), status=500)
-
-@csrf_exempt
-@require_http_methods(['POST'])
-def auth_logout(request):
-    """Logout (client-side session cleanup)"""
-    return _response(data={'message': 'Logged out'})
-
-# Company Endpoints
+# Product Endpoints
 
 @csrf_exempt
 @require_http_methods(['GET'])
-@_require_user
-def list_companies(request):
-    """List all companies for user"""
+def list_products(request):
+    """List all products with optional filtering"""
     try:
-        companies = get_user_companies(request.user_id)
-        return _response(data=companies)
-    except Exception as e:
-        return _response(error=str(e), status=500)
+        product_type = request.GET.get('type')
+        category = request.GET.get('category')
 
-@csrf_exempt
-@require_http_methods(['POST'])
-@_require_user
-def create_company(request):
-    """Create a new company"""
-    try:
-        data = json.loads(request.body)
-        company_data = {
-            'owner_id': request.user_id,
-            'display_name': data.get('display_name'),
-            'legal_name': data.get('legal_name'),
-            'currency': data.get('currency', 'USD'),
-            'country': data.get('country'),
-            'industry': data.get('industry'),
-        }
+        query = supabase.table(TABLE_PRODUCTS).select('*').eq('active', True)
 
-        response = supabase.table(TABLE_COMPANIES).insert(company_data).execute()
+        if product_type:
+            query = query.eq('type', product_type)
+        if category:
+            query = query.eq('category', category)
 
-        # Add owner as company member
-        if response.data:
-            company_id = response.data[0]['id']
-            member_data = {
-                'company_id': company_id,
-                'user_id': request.user_id,
-                'role': 'owner',
-                'status': 'active',
-            }
-            supabase.table(TABLE_COMPANY_MEMBERS).insert(member_data).execute()
-
-        return _response(data=response.data[0] if response.data else None)
-    except Exception as e:
-        return _response(error=str(e), status=500)
-
-@csrf_exempt
-@require_http_methods(['GET', 'PUT'])
-@_require_user
-def company_detail(request, company_id):
-    """Get or update company"""
-    if not _user_is_member_of_company(request, company_id):
-        return _response(error='Access denied', status=403)
-
-    try:
-        if request.method == 'GET':
-            response = supabase.table(TABLE_COMPANIES).select('*').eq('id', company_id).execute()
-            if response.data:
-                return _response(data=response.data[0])
-            return _response(error='Company not found', status=404)
-
-        elif request.method == 'PUT':
-            data = json.loads(request.body)
-            response = supabase.table(TABLE_COMPANIES).update(data).eq('id', company_id).execute()
-            return _response(data=response.data[0] if response.data else None)
-    except Exception as e:
-        return _response(error=str(e), status=500)
-
-@csrf_exempt
-@require_http_methods(['GET', 'POST'])
-@_require_user
-def company_members(request, company_id):
-    """List or add company members"""
-    if not _user_is_member_of_company(request, company_id):
-        return _response(error='Access denied', status=403)
-
-    try:
-        if request.method == 'GET':
-            response = supabase.table(TABLE_COMPANY_MEMBERS).select(
-                '*, users(*)'
-            ).eq('company_id', company_id).execute()
-            return _response(data=response.data)
-
-        elif request.method == 'POST':
-            data = json.loads(request.body)
-            member_data = {
-                'company_id': company_id,
-                'user_id': data.get('user_id'),
-                'role': data.get('role', 'user'),
-                'status': 'invited',
-            }
-            response = supabase.table(TABLE_COMPANY_MEMBERS).insert(member_data).execute()
-            return _response(data=response.data[0] if response.data else None)
-    except Exception as e:
-        return _response(error=str(e), status=500)
-
-# Bill Endpoints
-
-@csrf_exempt
-@require_http_methods(['GET', 'POST'])
-@_require_user
-def list_create_bills(request, company_id):
-    """List or create bills"""
-    if not _user_is_member_of_company(request, company_id):
-        return _response(error='Access denied', status=403)
-
-    try:
-        if request.method == 'GET':
-            response = supabase.table(TABLE_BILLS).select('*').eq('company_id', company_id).execute()
-            return _response(data=response.data)
-
-        elif request.method == 'POST':
-            data = json.loads(request.body)
-            bill_data = {**data, 'company_id': company_id}
-            response = supabase.table(TABLE_BILLS).insert(bill_data).execute()
-            return _response(data=response.data[0] if response.data else None, status=201)
-    except Exception as e:
-        return _response(error=str(e), status=500)
-
-@csrf_exempt
-@require_http_methods(['GET', 'PUT', 'DELETE'])
-@_require_user
-def bill_detail(request, company_id, bill_id):
-    """Get, update, or delete bill"""
-    if not _user_is_member_of_company(request, company_id):
-        return _response(error='Access denied', status=403)
-
-    try:
-        if request.method == 'GET':
-            response = supabase.table(TABLE_BILLS).select('*').eq('id', bill_id).eq('company_id', company_id).execute()
-            if response.data:
-                return _response(data=response.data[0])
-            return _response(error='Bill not found', status=404)
-
-        elif request.method == 'PUT':
-            data = json.loads(request.body)
-            response = supabase.table(TABLE_BILLS).update(data).eq('id', bill_id).execute()
-            return _response(data=response.data[0] if response.data else None)
-
-        elif request.method == 'DELETE':
-            supabase.table(TABLE_BILLS).delete().eq('id', bill_id).execute()
-            return _response(data={'message': 'Bill deleted'})
-    except Exception as e:
-        return _response(error=str(e), status=500)
-
-# Chart of Accounts Endpoints
-
-@csrf_exempt
-@require_http_methods(['GET', 'POST'])
-@_require_user
-def list_create_chart_of_accounts(request, company_id):
-    """List or create chart of accounts"""
-    if not _user_is_member_of_company(request, company_id):
-        return _response(error='Access denied', status=403)
-
-    try:
-        if request.method == 'GET':
-            response = supabase.table(TABLE_CHART_OF_ACCOUNTS).select('*').eq('company_id', company_id).execute()
-            return _response(data=response.data)
-
-        elif request.method == 'POST':
-            data = json.loads(request.body)
-            account_data = {**data, 'company_id': company_id}
-            response = supabase.table(TABLE_CHART_OF_ACCOUNTS).insert(account_data).execute()
-            return _response(data=response.data[0] if response.data else None, status=201)
-    except Exception as e:
-        return _response(error=str(e), status=500)
-
-@csrf_exempt
-@require_http_methods(['GET', 'PUT'])
-@_require_user
-def chart_of_account_detail(request, company_id, account_id):
-    """Get or update chart of account"""
-    if not _user_is_member_of_company(request, company_id):
-        return _response(error='Access denied', status=403)
-
-    try:
-        if request.method == 'GET':
-            response = supabase.table(TABLE_CHART_OF_ACCOUNTS).select('*').eq('id', account_id).eq('company_id', company_id).execute()
-            if response.data:
-                return _response(data=response.data[0])
-            return _response(error='Account not found', status=404)
-
-        elif request.method == 'PUT':
-            data = json.loads(request.body)
-            response = supabase.table(TABLE_CHART_OF_ACCOUNTS).update(data).eq('id', account_id).execute()
-            return _response(data=response.data[0] if response.data else None)
-    except Exception as e:
-        return _response(error=str(e), status=500)
-
-# Journal Entries Endpoints
-
-@csrf_exempt
-@require_http_methods(['GET', 'POST'])
-@_require_user
-def list_create_journal_entries(request, company_id):
-    """List or create journal entries"""
-    if not _user_is_member_of_company(request, company_id):
-        return _response(error='Access denied', status=403)
-
-    try:
-        if request.method == 'GET':
-            response = supabase.table(TABLE_JOURNAL_ENTRIES).select('*, journal_entry_lines(*)').eq('company_id', company_id).execute()
-            return _response(data=response.data)
-
-        elif request.method == 'POST':
-            data = json.loads(request.body)
-            lines = data.pop('lines', [])
-            entry_data = {**data, 'company_id': company_id, 'status': 'draft'}
-            response = supabase.table(TABLE_JOURNAL_ENTRIES).insert(entry_data).execute()
-
-            if response.data and lines:
-                entry_id = response.data[0]['id']
-                for line in lines:
-                    line['journal_entry_id'] = entry_id
-                supabase.table('journal_entry_lines').insert(lines).execute()
-
-            return _response(data=response.data[0] if response.data else None, status=201)
+        response = query.execute()
+        return _response(data=response.data)
     except Exception as e:
         return _response(error=str(e), status=500)
 
 @csrf_exempt
 @require_http_methods(['GET'])
-@_require_user
-def journal_entry_detail(request, company_id, entry_id):
-    """Get journal entry"""
-    if not _user_is_member_of_company(request, company_id):
-        return _response(error='Access denied', status=403)
-
+def product_detail(request, product_id):
+    """Get product details"""
     try:
-        response = supabase.table(TABLE_JOURNAL_ENTRIES).select('*, journal_entry_lines(*)').eq('id', entry_id).eq('company_id', company_id).execute()
+        response = supabase.table(TABLE_PRODUCTS).select('*').eq('id', product_id).execute()
         if response.data:
             return _response(data=response.data[0])
-        return _response(error='Journal entry not found', status=404)
+        return _response(error='Product not found', status=404)
     except Exception as e:
         return _response(error=str(e), status=500)
+
+# Rental Availability Endpoints
+
+@csrf_exempt
+@require_http_methods(['GET'])
+def get_availability(request, product_id):
+    """Get availability for a rental product"""
+    try:
+        start_date = request.GET.get('start_date')
+        end_date = request.GET.get('end_date')
+
+        if not start_date:
+            start_date = datetime.now().date().isoformat()
+        if not end_date:
+            end_date = (datetime.now().date() + timedelta(days=90)).isoformat()
+
+        query = supabase.table(TABLE_RENTAL_AVAILABILITY).select('*').eq('product_id', product_id)
+        query = query.gte('date', start_date).lte('date', end_date)
+
+        response = query.execute()
+        return _response(data=response.data)
+    except Exception as e:
+        return _response(error=str(e), status=500)
+
+# Booking Endpoints
 
 @csrf_exempt
 @require_http_methods(['POST'])
-@_require_user
-def post_journal_entry(request, company_id, entry_id):
-    """Post journal entry"""
-    if not _user_is_member_of_company(request, company_id):
-        return _response(error='Access denied', status=403)
-
+def create_booking(request):
+    """Create rental booking"""
     try:
-        supabase.table(TABLE_JOURNAL_ENTRIES).update({'status': 'posted'}).eq('id', entry_id).execute()
-        return _response(data={'message': 'Journal entry posted'})
-    except Exception as e:
-        return _response(error=str(e), status=500)
+        data = json.loads(request.body)
 
-# Items Endpoints
+        booking_data = {
+            'product_id': data.get('product_id'),
+            'customer_name': data.get('customer_name'),
+            'customer_email': data.get('customer_email'),
+            'customer_phone': data.get('customer_phone'),
+            'event_date': data.get('event_date'),
+            'fulfillment_type': data.get('fulfillment_type'),
+            'address': data.get('address'),
+            'message': data.get('message'),
+            'status': 'enquiry',
+        }
 
-@csrf_exempt
-@require_http_methods(['GET', 'POST'])
-@_require_user
-def list_create_items(request, company_id):
-    """List or create items"""
-    if not _user_is_member_of_company(request, company_id):
-        return _response(error='Access denied', status=403)
+        if data.get('fulfillment_type') == 'setup' and data.get('address'):
+            is_within = is_within_auckland(data.get('address'))
+            booking_data['is_within_auckland'] = is_within
+            booking_data['extra_fee'] = calculate_delivery_fee(data.get('address'))
 
-    try:
-        if request.method == 'GET':
-            response = supabase.table(TABLE_ITEMS).select('*').eq('company_id', company_id).execute()
-            return _response(data=response.data)
-
-        elif request.method == 'POST':
-            data = json.loads(request.body)
-            item_data = {**data, 'company_id': company_id}
-            response = supabase.table(TABLE_ITEMS).insert(item_data).execute()
-            return _response(data=response.data[0] if response.data else None, status=201)
+        response = supabase.table(TABLE_BOOKINGS).insert(booking_data).execute()
+        return _response(data=response.data[0] if response.data else None, status=201)
     except Exception as e:
         return _response(error=str(e), status=500)
 
 @csrf_exempt
-@require_http_methods(['GET', 'PUT'])
-@_require_user
-def item_detail(request, company_id, item_id):
-    """Get or update item"""
-    if not _user_is_member_of_company(request, company_id):
-        return _response(error='Access denied', status=403)
-
+@require_http_methods(['GET'])
+def booking_detail(request, booking_id):
+    """Get booking details"""
     try:
-        if request.method == 'GET':
-            response = supabase.table(TABLE_ITEMS).select('*').eq('id', item_id).eq('company_id', company_id).execute()
-            if response.data:
-                return _response(data=response.data[0])
-            return _response(error='Item not found', status=404)
-
-        elif request.method == 'PUT':
-            data = json.loads(request.body)
-            response = supabase.table(TABLE_ITEMS).update(data).eq('id', item_id).execute()
-            return _response(data=response.data[0] if response.data else None)
+        response = supabase.table(TABLE_BOOKINGS).select('*').eq('id', booking_id).execute()
+        if response.data:
+            return _response(data=response.data[0])
+        return _response(error='Booking not found', status=404)
     except Exception as e:
         return _response(error=str(e), status=500)
 
-# Tax Rates Endpoints
+# Order Endpoints
 
 @csrf_exempt
-@require_http_methods(['GET', 'POST'])
-@_require_user
-def list_create_tax_rates(request, company_id):
-    """List or create tax rates"""
-    if not _user_is_member_of_company(request, company_id):
-        return _response(error='Access denied', status=403)
-
+@require_http_methods(['POST'])
+def create_order(request):
+    """Create shop order"""
     try:
-        if request.method == 'GET':
-            response = supabase.table(TABLE_TAX_RATES).select('*').eq('company_id', company_id).execute()
-            return _response(data=response.data)
+        data = json.loads(request.body)
 
-        elif request.method == 'POST':
-            data = json.loads(request.body)
-            rate_data = {**data, 'company_id': company_id}
-            response = supabase.table(TABLE_TAX_RATES).insert(rate_data).execute()
-            return _response(data=response.data[0] if response.data else None, status=201)
+        order_data = {
+            'customer_name': data.get('customer_name'),
+            'customer_email': data.get('customer_email'),
+            'customer_phone': data.get('customer_phone'),
+            'items': data.get('items'),
+            'total_amount': data.get('total_amount'),
+            'payment_method': data.get('payment_method'),
+            'status': 'pending',
+            'shipping_address': data.get('shipping_address'),
+        }
+
+        response = supabase.table(TABLE_ORDERS).insert(order_data).execute()
+        return _response(data=response.data[0] if response.data else None, status=201)
     except Exception as e:
         return _response(error=str(e), status=500)
 
 @csrf_exempt
-@require_http_methods(['GET', 'PUT'])
-@_require_user
-def tax_rate_detail(request, company_id, rate_id):
-    """Get or update tax rate"""
-    if not _user_is_member_of_company(request, company_id):
-        return _response(error='Access denied', status=403)
-
+@require_http_methods(['GET'])
+def order_detail(request, order_id):
+    """Get order details"""
     try:
-        if request.method == 'GET':
-            response = supabase.table(TABLE_TAX_RATES).select('*').eq('id', rate_id).eq('company_id', company_id).execute()
-            if response.data:
-                return _response(data=response.data[0])
-            return _response(error='Tax rate not found', status=404)
+        response = supabase.table(TABLE_ORDERS).select('*').eq('id', order_id).execute()
+        if response.data:
+            return _response(data=response.data[0])
+        return _response(error='Order not found', status=404)
+    except Exception as e:
+        return _response(error=str(e), status=500)
 
-        elif request.method == 'PUT':
-            data = json.loads(request.body)
-            response = supabase.table(TABLE_TAX_RATES).update(data).eq('id', rate_id).execute()
-            return _response(data=response.data[0] if response.data else None)
+# Message Endpoints
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def create_message(request):
+    """Send a message related to a product/booking/order"""
+    try:
+        data = json.loads(request.body)
+
+        message_data = {
+            'related_to': data.get('related_to'),
+            'related_type': data.get('related_type'),
+            'sender_name': data.get('sender_name'),
+            'sender_email': data.get('sender_email'),
+            'content': data.get('content'),
+        }
+
+        response = supabase.table(TABLE_MESSAGES).insert(message_data).execute()
+        return _response(data=response.data[0] if response.data else None, status=201)
+    except Exception as e:
+        return _response(error=str(e), status=500)
+
+@csrf_exempt
+@require_http_methods(['GET'])
+def list_messages(request, related_id):
+    """List messages for a product/booking/order"""
+    try:
+        response = supabase.table(TABLE_MESSAGES).select('*').eq('related_to', related_id).execute()
+        return _response(data=response.data)
+    except Exception as e:
+        return _response(error=str(e), status=500)
+
+# Payment Endpoints
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def create_payment(request):
+    """Create a payment"""
+    try:
+        data = json.loads(request.body)
+
+        payment_data = {
+            'order_id': data.get('order_id'),
+            'booking_id': data.get('booking_id'),
+            'method': data.get('method'),
+            'amount': data.get('amount'),
+            'status': 'pending',
+        }
+
+        response = supabase.table(TABLE_PAYMENTS).insert(payment_data).execute()
+        return _response(data=response.data[0] if response.data else None, status=201)
+    except Exception as e:
+        return _response(error=str(e), status=500)
+
+@csrf_exempt
+@require_http_methods(['GET'])
+def payment_detail(request, payment_id):
+    """Get payment details"""
+    try:
+        response = supabase.table(TABLE_PAYMENTS).select('*').eq('id', payment_id).execute()
+        if response.data:
+            return _response(data=response.data[0])
+        return _response(error='Payment not found', status=404)
     except Exception as e:
         return _response(error=str(e), status=500)

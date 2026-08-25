@@ -1,143 +1,138 @@
-export interface User {
-  id: string
-  email: string
-  first_name: string
-  last_name: string
-  avatar_url?: string
-  created_at: string
-}
+export type ProductType = 'rental' | 'sale'
+export type FulfillmentType = 'setup' | 'pickup'
+export type BookingStatus = 'enquiry' | 'confirmed' | 'paid' | 'completed' | 'cancelled'
+export type OrderStatus = 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled'
+export type PaymentMethod = 'stripe' | 'bank_transfer' | 'afterpay'
+export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded'
 
-export interface Company {
+export interface Product {
   id: string
-  owner_id: string
-  display_name: string
-  legal_name: string
-  currency: string
-  country?: string
-  industry?: string
-  tax_id?: string
-  created_at: string
-  updated_at: string
-}
-
-export interface CompanyMember {
-  id: string
-  company_id: string
-  user_id: string
-  role: 'owner' | 'admin' | 'manager' | 'user'
-  status: 'active' | 'invited' | 'inactive'
-  joined_at: string
-  user?: User
-}
-
-export interface Role {
-  id: string
-  company_id: string
   name: string
+  slug: string
   description: string
-  permissions: Permission[]
-  created_at: string
-}
-
-export interface Permission {
-  id: string
-  name: string
-  description: string
-  resource: string
-  action: string
-}
-
-export interface ChartOfAccount {
-  id: string
-  company_id: string
-  account_number: string
-  name: string
-  type: 'asset' | 'liability' | 'equity' | 'revenue' | 'expense'
-  subtype?: string
-  balance: number
-  is_active: boolean
-  created_at: string
-}
-
-export interface TaxRate {
-  id: string
-  company_id: string
-  name: string
-  rate: number
-  is_active: boolean
-  created_at: string
-}
-
-export interface Item {
-  id: string
-  company_id: string
-  name: string
-  description?: string
-  sku?: string
-  unit_price: number
-  tax_rate_id?: string
-  is_active: boolean
-  created_at: string
-}
-
-export interface Bill {
-  id: string
-  company_id: string
-  bill_number: string
-  vendor_id: string
-  date: string
-  due_date: string
-  amount: number
-  status: 'draft' | 'sent' | 'received' | 'approved' | 'paid'
-  notes?: string
+  type: ProductType
+  category: string
+  base_price: number
+  images: string[]
+  active: boolean
   created_at: string
   updated_at: string
 }
 
-export interface PurchaseOrder {
+export interface RentalProduct extends Product {
+  type: 'rental'
+}
+
+export interface ShopProduct extends Product {
+  type: 'sale'
+}
+
+export interface RentalAvailability {
   id: string
-  company_id: string
-  po_number: string
-  vendor_id: string
+  product_id: string
   date: string
-  delivery_date: string
-  amount: number
-  status: 'draft' | 'sent' | 'received' | 'completed'
-  items: PurchaseOrderItem[]
+  is_available: boolean
+  booking_id?: string
+}
+
+export interface Booking {
+  id: string
+  product_id: string
+  customer_name: string
+  customer_email: string
+  customer_phone?: string
+  event_date: string
+  fulfillment_type: FulfillmentType
+  address?: string
+  is_within_auckland?: boolean
+  extra_fee: number
+  message?: string
+  status: BookingStatus
+  payment_method?: PaymentMethod
+  payment_id?: string
+  total_amount: number
   created_at: string
   updated_at: string
 }
 
-export interface PurchaseOrderItem {
-  id: string
-  purchase_order_id: string
-  item_id: string
+export interface OrderItem {
+  product_id: string
   quantity: number
-  unit_price: number
-  total: number
+  personalization?: string
+  price: number
 }
 
-export interface JournalEntry {
+export interface Order {
   id: string
-  company_id: string
-  entry_number: string
-  date: string
-  description: string
-  reference_type?: string
-  reference_id?: string
-  lines: JournalEntryLine[]
-  status: 'draft' | 'posted'
+  customer_name: string
+  customer_email: string
+  customer_phone?: string
+  items: OrderItem[]
+  total_amount: number
+  payment_method?: PaymentMethod
+  payment_id?: string
+  status: OrderStatus
+  shipping_address?: {
+    street: string
+    city: string
+    postcode: string
+    country: string
+  }
   created_at: string
   updated_at: string
 }
 
-export interface JournalEntryLine {
+export interface Message {
   id: string
-  journal_entry_id: string
-  account_id: string
-  debit?: number
-  credit?: number
-  description?: string
+  related_to: string
+  related_type: 'product' | 'booking' | 'order'
+  sender_name: string
+  sender_email: string
+  content: string
+  created_at: string
+}
+
+export interface Payment {
+  id: string
+  order_id?: string
+  booking_id?: string
+  method: PaymentMethod
+  amount: number
+  status: PaymentStatus
+  stripe_payment_id?: string
+  stripe_client_secret?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CartItem {
+  product_id: string
+  product: Product
+  quantity: number
+  personalization?: string
+}
+
+export interface RentalBookingFormData {
+  customerName: string
+  customerEmail: string
+  customerPhone?: string
+  eventDate: string
+  fulfillmentType: FulfillmentType
+  address?: string
+  message?: string
+}
+
+export interface ShopCheckoutData {
+  customerName: string
+  customerEmail: string
+  customerPhone?: string
+  shippingAddress: {
+    street: string
+    city: string
+    postcode: string
+    country: string
+  }
+  paymentMethod: PaymentMethod
 }
 
 export interface AuthSession {
