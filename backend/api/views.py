@@ -2,7 +2,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from functools import wraps
-from api.supabase_client import supabase
+from api.supabase_client import get_supabase_client
 import json
 from datetime import datetime, timedelta
 
@@ -44,7 +44,7 @@ def list_products(request):
         product_type = request.GET.get('type')
         category = request.GET.get('category')
 
-        query = supabase.table(TABLE_PRODUCTS).select('*').eq('active', True)
+        query = get_supabase_client().table(TABLE_PRODUCTS).select('*').eq('active', True)
 
         if product_type:
             query = query.eq('type', product_type)
@@ -61,7 +61,7 @@ def list_products(request):
 def product_detail(request, product_id):
     """Get product details"""
     try:
-        response = supabase.table(TABLE_PRODUCTS).select('*').eq('id', product_id).execute()
+        response = get_supabase_client().table(TABLE_PRODUCTS).select('*').eq('id', product_id).execute()
         if response.data:
             return _response(data=response.data[0])
         return _response(error='Product not found', status=404)
@@ -83,7 +83,7 @@ def get_availability(request, product_id):
         if not end_date:
             end_date = (datetime.now().date() + timedelta(days=90)).isoformat()
 
-        query = supabase.table(TABLE_RENTAL_AVAILABILITY).select('*').eq('product_id', product_id)
+        query = get_supabase_client().table(TABLE_RENTAL_AVAILABILITY).select('*').eq('product_id', product_id)
         query = query.gte('date', start_date).lte('date', end_date)
 
         response = query.execute()
@@ -117,7 +117,7 @@ def create_booking(request):
             booking_data['is_within_auckland'] = is_within
             booking_data['extra_fee'] = calculate_delivery_fee(data.get('address'))
 
-        response = supabase.table(TABLE_BOOKINGS).insert(booking_data).execute()
+        response = get_supabase_client().table(TABLE_BOOKINGS).insert(booking_data).execute()
         return _response(data=response.data[0] if response.data else None, status=201)
     except Exception as e:
         return _response(error=str(e), status=500)
@@ -127,7 +127,7 @@ def create_booking(request):
 def booking_detail(request, booking_id):
     """Get booking details"""
     try:
-        response = supabase.table(TABLE_BOOKINGS).select('*').eq('id', booking_id).execute()
+        response = get_supabase_client().table(TABLE_BOOKINGS).select('*').eq('id', booking_id).execute()
         if response.data:
             return _response(data=response.data[0])
         return _response(error='Booking not found', status=404)
@@ -154,7 +154,7 @@ def create_order(request):
             'shipping_address': data.get('shipping_address'),
         }
 
-        response = supabase.table(TABLE_ORDERS).insert(order_data).execute()
+        response = get_supabase_client().table(TABLE_ORDERS).insert(order_data).execute()
         return _response(data=response.data[0] if response.data else None, status=201)
     except Exception as e:
         return _response(error=str(e), status=500)
@@ -164,7 +164,7 @@ def create_order(request):
 def order_detail(request, order_id):
     """Get order details"""
     try:
-        response = supabase.table(TABLE_ORDERS).select('*').eq('id', order_id).execute()
+        response = get_supabase_client().table(TABLE_ORDERS).select('*').eq('id', order_id).execute()
         if response.data:
             return _response(data=response.data[0])
         return _response(error='Order not found', status=404)
@@ -188,7 +188,7 @@ def create_message(request):
             'content': data.get('content'),
         }
 
-        response = supabase.table(TABLE_MESSAGES).insert(message_data).execute()
+        response = get_supabase_client().table(TABLE_MESSAGES).insert(message_data).execute()
         return _response(data=response.data[0] if response.data else None, status=201)
     except Exception as e:
         return _response(error=str(e), status=500)
@@ -198,7 +198,7 @@ def create_message(request):
 def list_messages(request, related_id):
     """List messages for a product/booking/order"""
     try:
-        response = supabase.table(TABLE_MESSAGES).select('*').eq('related_to', related_id).execute()
+        response = get_supabase_client().table(TABLE_MESSAGES).select('*').eq('related_to', related_id).execute()
         return _response(data=response.data)
     except Exception as e:
         return _response(error=str(e), status=500)
@@ -220,7 +220,7 @@ def create_payment(request):
             'status': 'pending',
         }
 
-        response = supabase.table(TABLE_PAYMENTS).insert(payment_data).execute()
+        response = get_supabase_client().table(TABLE_PAYMENTS).insert(payment_data).execute()
         return _response(data=response.data[0] if response.data else None, status=201)
     except Exception as e:
         return _response(error=str(e), status=500)
@@ -230,7 +230,7 @@ def create_payment(request):
 def payment_detail(request, payment_id):
     """Get payment details"""
     try:
-        response = supabase.table(TABLE_PAYMENTS).select('*').eq('id', payment_id).execute()
+        response = get_supabase_client().table(TABLE_PAYMENTS).select('*').eq('id', payment_id).execute()
         if response.data:
             return _response(data=response.data[0])
         return _response(error='Payment not found', status=404)
