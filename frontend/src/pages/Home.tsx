@@ -4,6 +4,7 @@ import { Button } from '../components/ui'
 export function Home() {
   return (
     <div className="space-y-12">
+      <div className="text-2xl font-bold text-red-600">TEST: Home page loaded</div>
       {/* Hero Section */}
       <section className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4 -mx-6 -mt-20">
         <div className="max-w-4xl mx-auto text-center py-20">
