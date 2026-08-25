@@ -54,67 +54,32 @@ class ApiClient {
 
 export const apiClient = new ApiClient()
 
-export const authApi = {
-  getSession: () => apiClient.get('/auth/session'),
-  logout: () => apiClient.post('/auth/logout', {}),
+export const productApi = {
+  list: (filters?: { type?: string; category?: string }) =>
+    apiClient.get('/products/', { params: filters }),
+  get: (id: string) => apiClient.get(`/products/${id}/`),
 }
 
-export const companyApi = {
-  list: () => apiClient.get('/companies/'),
-  create: (data: unknown) => apiClient.post('/companies/', data),
-  get: (id: string) => apiClient.get(`/companies/${id}/`),
-  update: (id: string, data: unknown) => apiClient.put(`/companies/${id}/`, data),
-  getMembers: (id: string) => apiClient.get(`/companies/${id}/members/`),
-  addMember: (id: string, data: unknown) => apiClient.post(`/companies/${id}/members/`, data),
+export const rentalApi = {
+  getAvailability: (productId: string, startDate?: string, endDate?: string) =>
+    apiClient.get(`/products/${productId}/availability/`, {
+      params: { start_date: startDate, end_date: endDate },
+    }),
+  createBooking: (data: unknown) => apiClient.post('/bookings/', data),
+  getBooking: (id: string) => apiClient.get(`/bookings/${id}/`),
 }
 
-export const billApi = {
-  list: (companyId: string, params = {}) =>
-    apiClient.get(`/companies/${companyId}/bills/`, { params }),
-  create: (companyId: string, data: unknown) =>
-    apiClient.post(`/companies/${companyId}/bills/`, data),
-  get: (companyId: string, id: string) =>
-    apiClient.get(`/companies/${companyId}/bills/${id}/`),
-  update: (companyId: string, id: string, data: unknown) =>
-    apiClient.put(`/companies/${companyId}/bills/${id}/`, data),
-  delete: (companyId: string, id: string) =>
-    apiClient.delete(`/companies/${companyId}/bills/${id}/`),
+export const shopApi = {
+  createOrder: (data: unknown) => apiClient.post('/orders/', data),
+  getOrder: (id: string) => apiClient.get(`/orders/${id}/`),
 }
 
-export const chartOfAccountApi = {
-  list: (companyId: string) =>
-    apiClient.get(`/companies/${companyId}/chart-of-accounts/`),
-  create: (companyId: string, data: unknown) =>
-    apiClient.post(`/companies/${companyId}/chart-of-accounts/`, data),
-  update: (companyId: string, id: string, data: unknown) =>
-    apiClient.put(`/companies/${companyId}/chart-of-accounts/${id}/`, data),
+export const messageApi = {
+  create: (data: unknown) => apiClient.post('/messages/', data),
+  list: (relatedId: string) => apiClient.get(`/messages/${relatedId}/`),
 }
 
-export const journalEntryApi = {
-  list: (companyId: string, params = {}) =>
-    apiClient.get(`/companies/${companyId}/journal-entries/`, { params }),
-  create: (companyId: string, data: unknown) =>
-    apiClient.post(`/companies/${companyId}/journal-entries/`, data),
-  get: (companyId: string, id: string) =>
-    apiClient.get(`/companies/${companyId}/journal-entries/${id}/`),
-  post: (companyId: string, id: string) =>
-    apiClient.post(`/companies/${companyId}/journal-entries/${id}/post/`, {}),
-}
-
-export const itemApi = {
-  list: (companyId: string) =>
-    apiClient.get(`/companies/${companyId}/items/`),
-  create: (companyId: string, data: unknown) =>
-    apiClient.post(`/companies/${companyId}/items/`, data),
-  update: (companyId: string, id: string, data: unknown) =>
-    apiClient.put(`/companies/${companyId}/items/${id}/`, data),
-}
-
-export const taxRateApi = {
-  list: (companyId: string) =>
-    apiClient.get(`/companies/${companyId}/tax-rates/`),
-  create: (companyId: string, data: unknown) =>
-    apiClient.post(`/companies/${companyId}/tax-rates/`, data),
-  update: (companyId: string, id: string, data: unknown) =>
-    apiClient.put(`/companies/${companyId}/tax-rates/${id}/`, data),
+export const paymentApi = {
+  create: (data: unknown) => apiClient.post('/payments/', data),
+  get: (id: string) => apiClient.get(`/payments/${id}/`),
 }

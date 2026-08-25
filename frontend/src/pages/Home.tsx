@@ -1,143 +1,67 @@
-import React, { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader } from '@components/ui'
-import { PageHeader } from '@components/layout'
-import { useCompany } from '@context/CompanyContext'
-import { mockBills, mockJournalEntries } from '@data/mockData'
-import { formatCurrency, formatDate } from '@lib/utils'
-import { TrendingUp, DollarSign, CreditCard, BarChart3 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Button } from '@components/ui'
 
 export function Home() {
-  const { currentCompany } = useCompany()
-  const [stats] = useState({
-    totalRevenue: 150000,
-    totalExpenses: 60000,
-    cashBalance: 50000,
-    accountsReceivable: 25000,
-  })
-
-  if (!currentCompany) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-gray-600">Please select a company to continue</p>
-      </div>
-    )
-  }
-
   return (
-    <div className="space-y-8">
-      <PageHeader
-        title="Dashboard"
-        description={`Welcome back! Here's an overview of ${currentCompany.display_name}`}
-      />
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          title="Total Revenue"
-          value={formatCurrency(stats.totalRevenue)}
-          icon={<TrendingUp className="text-green-600" size={24} />}
-          trend="+12.5%"
-        />
-        <StatCard
-          title="Total Expenses"
-          value={formatCurrency(stats.totalExpenses)}
-          icon={<DollarSign className="text-red-600" size={24} />}
-          trend="-5.2%"
-        />
-        <StatCard
-          title="Cash Balance"
-          value={formatCurrency(stats.cashBalance)}
-          icon={<CreditCard className="text-blue-600" size={24} />}
-          trend="+8.3%"
-        />
-        <StatCard
-          title="Receivables"
-          value={formatCurrency(stats.accountsReceivable)}
-          icon={<BarChart3 className="text-purple-600" size={24} />}
-          trend="+3.1%"
-        />
-      </div>
-
-      {/* Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Bills */}
-        <Card>
-          <CardHeader>
-            <h2 className="text-lg font-semibold">Recent Bills</h2>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {mockBills.slice(0, 3).map((bill) => (
-                <div key={bill.id} className="flex items-center justify-between pb-4 border-b last:border-b-0">
-                  <div>
-                    <p className="font-medium text-gray-900">{bill.bill_number}</p>
-                    <p className="text-sm text-gray-500">{formatDate(bill.date)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-gray-900">{formatCurrency(bill.amount)}</p>
-                    <p className={`text-xs font-medium ${
-                      bill.status === 'paid' ? 'text-green-600' : 'text-yellow-600'
-                    }`}>
-                      {bill.status}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Recent Entries */}
-        <Card>
-          <CardHeader>
-            <h2 className="text-lg font-semibold">Recent Journal Entries</h2>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {mockJournalEntries.slice(0, 3).map((entry) => (
-                <div key={entry.id} className="flex items-center justify-between pb-4 border-b last:border-b-0">
-                  <div>
-                    <p className="font-medium text-gray-900">{entry.entry_number}</p>
-                    <p className="text-sm text-gray-500">{entry.description}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-gray-900">{formatDate(entry.date)}</p>
-                    <p className={`text-xs font-medium ${
-                      entry.status === 'posted' ? 'text-green-600' : 'text-blue-600'
-                    }`}>
-                      {entry.status}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  )
-}
-
-interface StatCardProps {
-  title: string
-  value: string
-  icon: React.ReactNode
-  trend?: string
-}
-
-function StatCard({ title, value, icon, trend }: StatCardProps) {
-  return (
-    <Card className="flex flex-col items-start">
-      <CardContent className="w-full pt-6">
-        <div className="flex items-start justify-between mb-4">
-          <div className="p-2 bg-gray-100 rounded-lg">
-            {icon}
+    <div className="space-y-12">
+      {/* Hero Section */}
+      <section className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4 -mx-6 -mt-20">
+        <div className="max-w-4xl mx-auto text-center py-20">
+          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
+            Beautiful Celebrations Start Here
+          </h1>
+          <p className="text-xl text-gray-700 mb-8">
+            Stunning decoration rentals and personalized wedding items for your special day
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link to="/rentals">
+              <Button className="px-8 py-3">Explore Rentals</Button>
+            </Link>
+            <Link to="/shop">
+              <Button variant="secondary" className="px-8 py-3">Browse Shop</Button>
+            </Link>
           </div>
-          {trend && <span className="text-xs font-medium text-green-600">{trend}</span>}
         </div>
-        <p className="text-sm text-gray-600 mb-1">{title}</p>
-        <p className="text-2xl font-bold text-gray-900">{value}</p>
-      </CardContent>
-    </Card>
+      </section>
+
+      {/* Services Section */}
+      <section className="py-12 px-4 max-w-6xl mx-auto">
+        <h2 className="text-4xl font-bold text-center mb-12">What We Offer</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="bg-white p-8 rounded-lg border">
+            <h3 className="text-2xl font-bold mb-4">Decoration Rentals</h3>
+            <p className="text-gray-600 mb-4">
+              Beautiful arches, backdrops, and floral arrangements for your event. Choose setup or pickup.
+            </p>
+            <Link to="/rentals" className="text-brand-600 font-semibold hover:underline">
+              View Rentals →
+            </Link>
+          </div>
+
+          <div className="bg-white p-8 rounded-lg border">
+            <h3 className="text-2xl font-bold mb-4">Wedding Shop</h3>
+            <p className="text-gray-600 mb-4">
+              Personalized glasses, napkins, and favors to make your celebration uniquely yours.
+            </p>
+            <Link to="/shop" className="text-brand-600 font-semibold hover:underline">
+              Browse Shop →
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="bg-brand-600 text-white py-12 px-4 rounded-lg max-w-6xl mx-auto w-full">
+        <div className="text-center">
+          <h2 className="text-3xl font-bold mb-4">Ready to Plan Your Event?</h2>
+          <p className="text-lg mb-6 opacity-90">
+            Contact us today for custom quotes and special requests
+          </p>
+          <Button className="bg-white text-brand-600 hover:bg-gray-100">
+            Get in Touch
+          </Button>
+        </div>
+      </section>
+    </div>
   )
 }

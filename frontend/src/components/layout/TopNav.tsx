@@ -1,29 +1,14 @@
-import React, { useState } from 'react'
-import { Menu, LogOut, User } from 'lucide-react'
-import { useCompany } from '@context/CompanyContext'
-import { Dropdown, type DropdownItem } from '../ui'
+import { Link } from 'react-router-dom'
+import { Menu, ShoppingCart } from 'lucide-react'
 
 interface TopNavProps {
   onMenuClick: () => void
 }
 
 export function TopNav({ onMenuClick }: TopNavProps) {
-  const { currentCompany, companies } = useCompany()
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
-
-  const companyItems: DropdownItem[] = companies.map((company) => ({
-    label: company.display_name,
-    value: company.id,
-  }))
-
-  const userMenuItems: DropdownItem[] = [
-    { label: 'Profile', value: 'profile', icon: <User size={16} /> },
-    { label: 'Logout', value: 'logout', icon: <LogOut size={16} /> },
-  ]
-
   return (
     <header className="h-16 bg-white border-b border-gray-200 px-6 flex items-center justify-between">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-8">
         <button
           onClick={onMenuClick}
           className="md:hidden p-2 hover:bg-gray-100 rounded-md transition-colors"
@@ -31,27 +16,32 @@ export function TopNav({ onMenuClick }: TopNavProps) {
           <Menu size={20} />
         </button>
 
-        {currentCompany && (
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-sm font-medium text-gray-900">
-                {currentCompany.display_name}
-              </p>
-              <p className="text-xs text-gray-500">
-                {currentCompany.currency}
-              </p>
-            </div>
-          </div>
-        )}
+        <Link to="/" className="text-xl font-bold text-brand-600 no-underline">
+          Aziza Events
+        </Link>
+
+        <nav className="hidden md:flex items-center gap-6">
+          <Link to="/rentals" className="text-sm font-medium text-gray-700 hover:text-brand-600 transition-colors no-underline">
+            Rentals
+          </Link>
+          <Link to="/shop" className="text-sm font-medium text-gray-700 hover:text-brand-600 transition-colors no-underline">
+            Shop
+          </Link>
+          <a href="#how-it-works" className="text-sm font-medium text-gray-700 hover:text-brand-600 transition-colors">
+            How It Works
+          </a>
+          <a href="#about" className="text-sm font-medium text-gray-700 hover:text-brand-600 transition-colors">
+            About
+          </a>
+          <a href="#contact" className="text-sm font-medium text-gray-700 hover:text-brand-600 transition-colors">
+            Contact
+          </a>
+        </nav>
       </div>
 
       <div className="flex items-center gap-4">
-        <button
-          onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-          className="w-10 h-10 rounded-full bg-brand-600 text-white flex items-center justify-center font-semibold hover:bg-brand-700 transition-colors"
-          title="User menu"
-        >
-          J
+        <button className="p-2 hover:bg-gray-100 rounded-md transition-colors" title="Cart">
+          <ShoppingCart size={20} />
         </button>
       </div>
     </header>
