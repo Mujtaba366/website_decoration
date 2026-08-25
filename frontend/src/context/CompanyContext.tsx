@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import type { Company } from '@types'
-import { companyApi } from '@lib/api'
+import type { Company } from '../types'
+import { companyApi } from '../lib/api'
 
 interface CompanyContextType {
   currentCompany: Company | null

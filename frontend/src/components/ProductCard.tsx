@@ -1,4 +1,4 @@
-import type { Product } from '@types'
+import type { Product } from '../types'
 import { Card, Button } from '@/components/ui'
 import { Link } from 'react-router-dom'
 

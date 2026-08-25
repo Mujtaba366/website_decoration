@@ -1,11 +1,11 @@
 import React, { useState } from 'react'
-import { Button, Card, CardContent, CardHeader, DataTable, Badge } from '@components/ui'
-import { PageHeader } from '@components/layout'
-import { useCompany } from '@context/CompanyContext'
+import { Button, Card, CardContent, CardHeader, DataTable, Badge } from '../components/ui'
+import { PageHeader } from '../components/layout'
+import { useCompany } from '../context/CompanyContext'
 import { mockBills } from '@data/mockData'
-import { formatCurrency, formatDate } from '@lib/utils'
+import { formatCurrency, formatDate } from '../lib/utils'
 import { Plus, Edit, Trash2 } from 'lucide-react'
-import type { Bill } from '@types'
+import type { Bill } from '../types'
 
 export function Bills() {
   const { currentCompany } = useCompany()

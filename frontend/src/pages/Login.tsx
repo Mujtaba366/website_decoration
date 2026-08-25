@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, CardContent, CardHeader, Input, Form, FormGroup, FormLabel } from '@components/ui'
+import { Button, Card, CardContent, CardHeader, Input, Form, FormGroup, FormLabel } from '../components/ui'
 
 export function Login() {
   const navigate = useNavigate()

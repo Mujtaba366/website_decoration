@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { Product } from '@types'
+import type { Product } from '../types'
 import { productApi } from '@/lib/api'
 import { ProductCard } from '@/components/ProductCard'
 import { PageHeader } from '@/components/layout'

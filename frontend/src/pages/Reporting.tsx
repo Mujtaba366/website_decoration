@@ -1,7 +1,7 @@
 import React from 'react'
-import { Card, CardContent, CardHeader } from '@components/ui'
-import { PageHeader } from '@components/layout'
-import { useCompany } from '@context/CompanyContext'
+import { Card, CardContent, CardHeader } from '../components/ui'
+import { PageHeader } from '../components/layout'
+import { useCompany } from '../context/CompanyContext'
 
 export function Reporting() {
   const { currentCompany } = useCompany()

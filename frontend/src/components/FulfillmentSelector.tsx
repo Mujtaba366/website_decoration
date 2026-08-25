@@ -1,4 +1,4 @@
-import type { FulfillmentType } from '@types'
+import type { FulfillmentType } from '../types'
 import { Card } from '@/components/ui'
 
 interface FulfillmentSelectorProps {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import type { Product, CartItem } from '@types'
+import type { Product, CartItem } from '../types'
 import { productApi, shopApi } from '@/lib/api'
 import { Button, Card, Input } from '@/components/ui'
 

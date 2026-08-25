@@ -1,11 +1,11 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { Layout } from '@components/layout'
-import { Home } from '@pages/Home'
-import { NotFound } from '@pages/NotFound'
-import Rentals from '@pages/Rentals'
-import Shop from '@pages/Shop'
-import RentalDetail from '@pages/RentalDetail'
-import ShopDetail from '@pages/ShopDetail'
+import { Layout } from './components/layout'
+import { Home } from './pages/Home'
+import { NotFound } from './pages/NotFound'
+import Rentals from './pages/Rentals'
+import Shop from './pages/Shop'
+import RentalDetail from './pages/RentalDetail'
+import ShopDetail from './pages/ShopDetail'
 
 function AppContent() {
   return (

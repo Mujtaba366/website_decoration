@@ -1,11 +1,11 @@
 import React, { useState } from 'react'
-import { Button, Card, CardContent, CardHeader, DataTable } from '@components/ui'
-import { PageHeader } from '@components/layout'
-import { useCompany } from '@context/CompanyContext'
+import { Button, Card, CardContent, CardHeader, DataTable } from '../components/ui'
+import { PageHeader } from '../components/layout'
+import { useCompany } from '../context/CompanyContext'
 import { mockChartOfAccounts } from '@data/mockData'
-import { formatCurrency } from '@lib/utils'
+import { formatCurrency } from '../lib/utils'
 import { Plus } from 'lucide-react'
-import type { ChartOfAccount } from '@types'
+import type { ChartOfAccount } from '../types'
 
 export function Accounting() {
   const { currentCompany } = useCompany()

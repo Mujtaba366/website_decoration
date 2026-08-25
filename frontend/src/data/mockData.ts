@@ -8,7 +8,7 @@ import type {
   Item,
   JournalEntry,
   PurchaseOrder,
-} from '@types'
+} from '../types'
 
 export const mockUser: User = {
   id: '1',

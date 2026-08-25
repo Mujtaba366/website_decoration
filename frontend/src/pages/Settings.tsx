@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
-import { Button, Card, CardContent, CardHeader, Input, Form, FormGroup, FormLabel } from '@components/ui'
-import { PageHeader } from '@components/layout'
-import { useCompany } from '@context/CompanyContext'
+import { Button, Card, CardContent, CardHeader, Input, Form, FormGroup, FormLabel } from '../components/ui'
+import { PageHeader } from '../components/layout'
+import { useCompany } from '../context/CompanyContext'
 
 export function Settings() {
   const { currentCompany } = useCompany()

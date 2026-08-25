@@ -1,10 +1,10 @@
 import React, { useState } from 'react'
-import { Button, Card, CardContent, CardHeader, DataTable, Badge } from '@components/ui'
-import { PageHeader } from '@components/layout'
-import { useCompany } from '@context/CompanyContext'
+import { Button, Card, CardContent, CardHeader, DataTable, Badge } from '../components/ui'
+import { PageHeader } from '../components/layout'
+import { useCompany } from '../context/CompanyContext'
 import { mockCompanyMembers } from '@data/mockData'
 import { Plus } from 'lucide-react'
-import type { CompanyMember } from '@types'
+import type { CompanyMember } from '../types'
 
 export function Team() {
   const { currentCompany } = useCompany()
