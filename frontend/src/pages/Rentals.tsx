@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { Product } from '../types'
 import { productApi } from '../lib/api'
-import { ProductCard } from '@/components/ProductCard'
-import { PageHeader } from '@/components/layout'
+import { ProductCard } from '../components/ProductCard'
+import { PageHeader } from '../components/layout'
 
 const CATEGORIES = ['Arches', 'Backdrops', 'Benches', 'Florals', 'Table Settings']
 
