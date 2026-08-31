@@ -1,0 +1,30 @@
+services:
+  # Backend API
+  - type: web
+    name: backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -w 4 -b 0.0.0.0:$PORT web:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: SUPABASE_URL
+        sync: false # set in Render dashboard - do not commit the real project URL/keys
+      - key: SUPABASE_KEY
+        sync: false # set in Render dashboard - anon key
+      - key: FLASK_ENV
+        value: production
+      - key: CORS_ORIGINS
+        value: https://website-decoration.onrender.com
+
+  # Frontend
+  - type: web
+    name: frontend
+    runtime: node
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        value: https://decoration-website.onrender.com/api
