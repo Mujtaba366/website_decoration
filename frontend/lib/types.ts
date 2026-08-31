@@ -90,4 +90,7 @@ export interface SiteSettings {
   hero_eyebrow: string | null;
   hero_heading: string | null;
   hero_subheading: string | null;
+  about_heading: string | null;
+  about_subheading: string | null;
+  about_story: string | null;
 }

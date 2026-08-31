@@ -2,8 +2,12 @@
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Heart, Flower2, Sparkles, Users } from 'lucide-react';
+import { useSiteSettings } from '@/components/site-settings-context';
 
 export default function AboutPage() {
+  const { site_name, about_heading, about_subheading, about_story } = useSiteSettings();
+  const storyParagraphs = (about_story || '').split(/\n\s*\n/).filter(Boolean);
+
   return (
     <div>
       {/* Hero */}
@@ -15,10 +19,10 @@ export default function AboutPage() {
         <div className="absolute inset-0 bg-sage-900/50" />
         <div className="relative z-10 h-full flex flex-col items-center justify-center text-center px-4">
           <h1 className="font-serif text-5xl md:text-6xl font-semibold text-white text-balance">
-            Our Story
+            {about_heading}
           </h1>
           <p className="mt-4 text-lg text-white/80 max-w-xl">
-            A passion for beautiful weddings and creating unforgettable moments.
+            {about_subheading}
           </p>
         </div>
       </section>
@@ -44,27 +48,16 @@ export default function AboutPage() {
           </div>
 
           <h2 className="font-serif text-3xl font-semibold text-sage-800 mb-4">
-            Hi, we&apos;re Bloom &amp; Vow
+            Hi, we&apos;re {site_name}
           </h2>
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            Based right here in Auckland, what started as helping a friend style their
-            wedding venue turned into a full-blown obsession with creating beautiful
-            spaces for couples on their big day.
-          </p>
-          <p className="text-muted-foreground leading-relaxed mb-4">
-            We know firsthand how stressful wedding planning can be. There&apos;s the
-            budget, the timeline, the endless decisions. That&apos;s why we keep things
-            simple: beautiful decorations, fair prices, and we handle the heavy lifting
-            — literally. You pick what you love, we set it up, and you walk into a
-            venue that takes your breath away.
-          </p>
-          <p className="text-muted-foreground leading-relaxed mb-12">
-            Every piece in our collection has been hand-picked and styled with care.
-            We&apos;re not a big rental warehouse — we care about every single booking.
-            When you rent from us, you&apos;re not just getting decorations.
-            You&apos;re getting our time, our attention, and our promise
-            that your venue will look exactly how you imagined it.
-          </p>
+          {storyParagraphs.map((paragraph, i) => (
+            <p
+              key={i}
+              className={`text-muted-foreground leading-relaxed ${i === storyParagraphs.length - 1 ? 'mb-12' : 'mb-4'}`}
+            >
+              {paragraph}
+            </p>
+          ))}
         </div>
 
         {/* Values */}

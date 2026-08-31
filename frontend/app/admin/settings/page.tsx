@@ -17,6 +17,9 @@ interface SiteSettingsForm {
   hero_eyebrow: string;
   hero_heading: string;
   hero_subheading: string;
+  about_heading: string;
+  about_subheading: string;
+  about_story: string;
 }
 
 const emptySettings: SiteSettingsForm = {
@@ -30,6 +33,9 @@ const emptySettings: SiteSettingsForm = {
   hero_eyebrow: '',
   hero_heading: '',
   hero_subheading: '',
+  about_heading: '',
+  about_subheading: '',
+  about_story: '',
 };
 
 export default function AdminSettings() {
@@ -74,6 +80,9 @@ export default function AdminSettings() {
             hero_eyebrow: data.hero_eyebrow || '',
             hero_heading: data.hero_heading || '',
             hero_subheading: data.hero_subheading || '',
+            about_heading: data.about_heading || '',
+            about_subheading: data.about_subheading || '',
+            about_story: data.about_story || '',
           });
         } else {
           setSettingsError(await describeError(res, 'Failed to load settings'));
@@ -429,6 +438,65 @@ export default function AdminSettings() {
                 disabled={settingsLoading}
                 rows={3}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <button
+              onClick={handleSaveSettings}
+              disabled={settingsLoading || settingsSaving}
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-60"
+            >
+              {settingsSaving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+
+        {/* About Page */}
+        <div className="bg-white rounded-lg shadow">
+          <div className="px-6 py-4 border-b border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-900">About Page</h2>
+            <p className="text-sm text-slate-500 mt-1">
+              The &quot;Our Story&quot; heading and text on the About page. Leave a blank
+              line between paragraphs.
+            </p>
+          </div>
+          <div className="px-6 py-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Heading
+              </label>
+              <input
+                type="text"
+                placeholder="Our Story"
+                value={settings.about_heading}
+                onChange={(e) => setSettings({ ...settings, about_heading: e.target.value })}
+                disabled={settingsLoading}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Subheading
+              </label>
+              <input
+                type="text"
+                placeholder="A passion for beautiful weddings..."
+                value={settings.about_subheading}
+                onChange={(e) => setSettings({ ...settings, about_subheading: e.target.value })}
+                disabled={settingsLoading}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Story
+              </label>
+              <textarea
+                placeholder="Tell customers about your business..."
+                value={settings.about_story}
+                onChange={(e) => setSettings({ ...settings, about_story: e.target.value })}
+                disabled={settingsLoading}
+                rows={10}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-sans"
               />
             </div>
             <button
