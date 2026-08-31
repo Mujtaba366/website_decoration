@@ -1,9 +1,127 @@
 # Overnight work log
 
-**Status as of this writing: all 5 stated priorities have a first pass done and
-verified. Tree is committed, builds clean, DB is back to its exact starting row
-counts and values.** See "What's left / natural next steps" at the bottom for what
-wasn't attempted and why.
+## Round two (this section first, most recent work; round one log follows below)
+
+Second unattended session, same constraints as round one plus: no new installs, no
+new ports, no new permissions, no new external network calls beyond what round one
+already used (Supabase MCP, local dev servers, local git). Priorities: work through
+what round one deferred, add automated tests without new dependencies, finish the
+correctness sweep, go deeper on admin UX, and harden the Flask side against bad
+input/missing records/an unreachable Supabase. Do not act on SECURITY_DEBT.md.
+
+### [R2-1] Correctness sweep, continued
+
+Found and fixed a real bug in `frontend/hooks/use-api.ts`: its second parameter was
+typed as `initialData`, but all three call sites (`Home`, `Rentals`, `Shop`) call it
+as `useApi(fetchFn, [])`, clearly intending `[]` as a dependency array. Since
+`[] !== null`, the hook's `loading` state incorrectly initialized to `false`, so the
+loading skeleton never appeared during the very first fetch on any of those three
+pages - it would briefly render the "no results" empty state instead. Fixed by
+dropping the parameter that was never actually used as intended by any caller.
+
+Also found in `backend/app/view.py`: five `update_*` view functions
+(`update_product`, `update_booking`, `update_availability`, `update_order`,
+`update_payment`) returned **200 with a null body** when the target id didn't exist,
+instead of 404 - silently "succeeding" at updating something that was never found.
+The equivalent `admin_*.py` endpoints already had this right; only the public
+`view.py` versions had the bug. Fixed all five, with regression tests.
+
+Extracted duplicated logic while fixing/testing it: `toDateOnly` existed separately
+in the product page and the admin rentals page; `isWithinAuckland` and its postcode
+list only existed in the product page but deserved to be testable on its own. Both
+now live in `frontend/lib/date-utils.ts`, imported by both consumers.
+
+**Data-correctness note, not fixed**: the Auckland postcode list
+(`AUCKLAND_POSTCODES`) spans `0600`-`2999`. Real Auckland postcodes don't reach that
+high - the upper end of that range is Horowhenua/Wairarapa territory, well south of
+Auckland (hours past Wellington's rural hinterland). This determines whether a
+customer gets charged an out-of-area delivery fee, so it's a real business-logic
+concern, not cosmetic. **Did not attempt to correct it** - fixing it right needs an
+authoritative NZ postcode-to-region mapping to check against, and this round's rules
+explicitly disallow new external network calls (which is what looking that up would
+need). Flagged in a comment in `date-utils.ts` and here. This is the single most
+concrete "needs permission" item from this round - see that section below.
+
+Also removed two unused imports in `admin_dashboard.py` (`get_all_sessions`, `uuid`)
+found while reading through every backend file line by line for the sweep.
+
+### [R2-2] Automated tests (none existed before this)
+
+**Backend** (`backend/tests/`, 37 tests): `unittest` + Flask's own `test_client()` -
+both already present with no new install (`test_client()` ships with Flask itself).
+A hand-rolled `FakeSupabaseClient` (`fake_supabase.py`) stands in for the real REST
+client so tests exercise actual Flask routing/view code with zero network calls to
+the live project, including enforcing the one UNIQUE constraint the booking-race fix
+depends on (`blocked_dates.date`). Covers: the global calendar blocking a date across
+every product, the booking race-condition fix and its rollback path, 404s on missing
+records, auth gating on every admin endpoint, the product slug/base_price fix,
+blocked-date and delivery-option conflict handling, Supabase-unreachable → 503
+translation, and session expiry. Run with:
+`venv/Scripts/python.exe -m unittest discover -s backend/tests -p "test_*.py" -v`
+
+**Frontend** (`frontend/lib/date-utils.test.ts`, 7 tests): Node 22+'s built-in
+`node:test` + `node:assert`, which can import `.ts` files with simple type
+annotations directly - confirmed this empirically before relying on it, no
+ts-node/jest/vitest needed. Covers `toDateOnly` (including a regression guard
+against the exact `toISOString()` timezone bug that shipped once already) and
+`isWithinAuckland`. Run with `npm test` (added as a package.json script) or
+`node --test`.
+
+Excluded `**/*.test.ts` from `frontend/tsconfig.json` - Node requires the `.ts`
+extension in the test file's own import path to resolve it, but `tsc` rejects
+explicit `.ts` extensions in imports by default; excluding test files from the app's
+typecheck avoids the conflict without loosening `tsc` for real app code. Verified
+`npm run typecheck` and `npm run build` both still pass clean after this.
+
+Full backend + frontend test runs, plus a full `npm run build`, all verified passing
+before every commit in this section.
+
+### [R2-3] Flask resilience pass
+
+Empirically tested (via `app.test_client()`, not just read the code) what happens on
+bad input before "fixing" anything, since the prior round's notes already flagged
+this as unverified:
+- No `Content-Type: application/json` → Flask's own 415, HTML body.
+- Malformed JSON body → 400, HTML body.
+- Empty body → 400, HTML body.
+- Literal `null` body → 200, `None` passed straight through to the view function.
+
+None of these crashed (no 500/debugger), but the first three broke the API's own
+"always JSON" contract, and the fourth meant a `null` body reached
+`supabase.table(...).insert(None)` with no validation at all. Fixed:
+- Added global `@app.errorhandler(400)` / `@app.errorhandler(415)` in `web.py`
+  returning this API's normal `{'error': ...}` shape instead of Flask's default HTML
+  page.
+- Added a `require_body()` guard plus required-field checks (booking needs
+  product_id/customer_name/contact/event_date, etc.) to every public create/update
+  view, so a bad request gets a specific, correct-status-code answer instead of
+  whatever error Postgres happens to produce three calls later.
+- No request to Supabase had a timeout - a hung connection would hang the Flask
+  request indefinitely. Added a 10s timeout to every call in `supabase_client.py`.
+- A network failure reaching Supabase (unreachable, DNS failure, timeout) surfaced as
+  a raw `requests` exception with the wrong status code. Now becomes
+  `SupabaseError(503, ...)` with a clear message; `handle_error()` maps SupabaseError
+  status codes (503/409/etc) to a short human-readable summary instead of always
+  answering 400 with a raw Postgres/PostgREST error string.
+
+All of the above has passing regression tests (see R2-2).
+
+### [R2-4] Still in progress this round
+
+Admin UX depth pass (loading states, specific error messages, confirm dialogs on
+destructive actions, empty states, mobile layout) and continuing the DB-driven
+content customization from round one (about page / how-it-works copy) - see the log
+entries below this line as they land, and the final summary at the very bottom for
+what actually got done vs. deferred again.
+
+---
+
+## Round one (original session)
+
+**Status as of round one's end: all 5 stated priorities had a first pass done and
+verified. Tree was committed, built clean, DB was back to its exact starting row
+counts and values.** See "What's left / natural next steps" below for what round one
+deferred - most of it is what round two above is working through.
 
 
 Working unattended per standing instructions. Local commits only — no push, no remote,
