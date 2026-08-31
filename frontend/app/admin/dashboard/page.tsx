@@ -61,26 +61,19 @@ export default function AdminDashboard() {
   const fetchStats = async () => {
     try {
       const token = getAdminToken();
-      console.log('Dashboard - Token:', token ? token.substring(0, 20) + '...' : 'NO TOKEN');
-
       if (!token) {
-        console.error('No token found in session');
         setLoading(false);
         return;
       }
 
-      console.log('Fetching stats from:', `${API_BASE}/admin/dashboard/stats`);
       const response = await fetch(`${API_BASE}/admin/dashboard/stats`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
 
-      console.log('Stats response status:', response.status);
-
       if (response.ok) {
         const data = await response.json();
-        console.log('Stats data:', data);
         setStats(data);
       } else {
         const error = await response.json();

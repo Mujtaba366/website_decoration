@@ -27,14 +27,10 @@ export default function AdminLogin() {
     setIsSubmitting(true);
 
     try {
-      console.log('Login attempt:', username);
       const session = await authenticateAdmin({ username, password });
-      console.log('Login response:', session);
       if (session) {
-        console.log('Login successful, redirecting to dashboard');
         router.push('/admin/dashboard');
       } else {
-        console.log('Login failed: no session returned');
         setErrorMessage('Incorrect username or password. Try again.');
       }
     } catch (err) {
@@ -78,21 +74,6 @@ export default function AdminLogin() {
             Sign in to manage accounts, review activity, and keep the books balanced.
           </p>
         </div>
-
-        {/* <div className="relative z-10 max-w-[34ch] border-t border-[#faf9f6]/18 pt-4 font-mono text-[0.8rem]">
-          {tapeRows.map((row) => (
-            <div key={row.label} className="flex justify-between py-[0.32rem] text-[#faf9f6]/55">
-              <span className="text-[#faf9f6]/40">{row.label}</span>
-              <span className={row.kind === 'credit' ? 'text-[#74c69d]' : 'text-[#e0a370]'}>
-                {row.value}
-              </span>
-            </div>
-          ))}
-          <div className="mt-2.5 flex justify-between border-t border-[#faf9f6]/18 pt-3 font-medium text-[#faf9f6]">
-            <span>System status</span>
-            <span>Balanced</span>
-          </div>
-        </div> */}
       </div>
 
       {/* right: login form */}
