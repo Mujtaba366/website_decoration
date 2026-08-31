@@ -12,12 +12,11 @@ interface UseApiReturn<T> extends UseApiState<T> {
 
 export function useApi<T>(
   apiCall: () => Promise<T>,
-  initialData: T | null = null,
   deps: DependencyList = []
 ): UseApiReturn<T> {
   const [state, setState] = useState<UseApiState<T>>({
-    data: initialData,
-    loading: initialData === null,
+    data: null,
+    loading: true,
     error: null,
   });
 
@@ -29,12 +28,13 @@ export function useApi<T>(
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred';
       setState({
-        data: initialData,
+        data: null,
         loading: false,
         error: errorMessage,
       });
     }
-  }, [apiCall, initialData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
 
   useEffect(() => {
     refetch();

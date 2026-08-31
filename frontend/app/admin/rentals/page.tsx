@@ -5,6 +5,7 @@ import { getAdminToken } from '@/lib/admin-auth';
 import { useEffect, useMemo, useState } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Trash2, Plus, X } from 'lucide-react';
+import { toDateOnly } from '@/lib/date-utils';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -37,13 +38,6 @@ interface DeliveryOption {
 }
 
 const STATUS_OPTIONS: Booking['status'][] = ['enquiry', 'confirmed', 'paid', 'completed'];
-
-function toDateOnly(d: Date) {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 export default function AdminRentals() {
   const [bookings, setBookings] = useState<Booking[]>([]);
