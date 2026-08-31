@@ -54,6 +54,18 @@ export default function AdminRentals() {
     return token ? { Authorization: `Bearer ${token}` } : null;
   };
 
+  /** Pulls the backend's own error message out of a failed response instead
+   * of showing a generic "Failed to X" - the backend now says specifically
+   * what went wrong (e.g. "That date is already blocked"). */
+  const describeError = async (res: Response, fallback: string) => {
+    try {
+      const body = await res.json();
+      return body.error || fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
   const fetchAll = async () => {
     const headers = authHeaders();
     if (!headers) return;
@@ -68,9 +80,13 @@ export default function AdminRentals() {
       if (bookingsRes.ok) setBookings((await bookingsRes.json()).bookings || []);
       if (blockedRes.ok) setBlockedDates(await blockedRes.json());
       if (optionsRes.ok) setDeliveryOptions(await optionsRes.json());
+
+      if (!bookingsRes.ok || !blockedRes.ok || !optionsRes.ok) {
+        setError('Some rentals data failed to load. Try refreshing the page.');
+      }
     } catch (err) {
       console.error('Failed to load rentals data:', err);
-      setError('Failed to load rentals data');
+      setError('Could not reach the server. Check your connection and try refreshing.');
     } finally {
       setLoading(false);
     }
@@ -112,7 +128,7 @@ export default function AdminRentals() {
         setSuccess(`${dateStr} unblocked`);
         fetchAll();
       } else {
-        setError('Failed to unblock date');
+        setError(await describeError(res, 'Failed to unblock date'));
       }
     } else {
       const res = await fetch(`${API_BASE}/admin/blocked-dates`, {
@@ -124,12 +140,17 @@ export default function AdminRentals() {
         setSuccess(`${dateStr} blocked`);
         fetchAll();
       } else {
-        setError('Failed to block date');
+        setError(await describeError(res, 'Failed to block date'));
       }
     }
   };
 
   const handleUnblock = async (blocked: BlockedDate) => {
+    const confirmMessage = blocked.booking_id
+      ? `${blocked.date} is linked to a booking. Unblocking it will NOT cancel that booking - the date will just show as available again. Continue?`
+      : `Unblock ${blocked.date}?`;
+    if (!confirm(confirmMessage)) return;
+
     const headers = authHeaders();
     if (!headers) return;
     setError('');
@@ -143,13 +164,14 @@ export default function AdminRentals() {
       setSuccess(`${blocked.date} unblocked`);
       fetchAll();
     } else {
-      setError('Failed to unblock date');
+      setError(await describeError(res, 'Failed to unblock date'));
     }
   };
 
   const handleStatusChange = async (bookingId: string, status: string) => {
     const headers = authHeaders();
     if (!headers) return;
+    setError('');
 
     const res = await fetch(`${API_BASE}/admin/bookings/${bookingId}`, {
       method: 'PUT',
@@ -159,7 +181,7 @@ export default function AdminRentals() {
     if (res.ok) {
       fetchAll();
     } else {
-      setError('Failed to update booking status');
+      setError(await describeError(res, 'Failed to update booking status'));
     }
   };
 
@@ -167,6 +189,7 @@ export default function AdminRentals() {
     e.preventDefault();
     const headers = authHeaders();
     if (!headers || !newOption.label.trim()) return;
+    setError('');
 
     const res = await fetch(`${API_BASE}/admin/delivery-options`, {
       method: 'POST',
@@ -184,13 +207,14 @@ export default function AdminRentals() {
       setShowAddOption(false);
       fetchAll();
     } else {
-      setError('Failed to add delivery option');
+      setError(await describeError(res, 'Failed to add delivery option'));
     }
   };
 
   const toggleOptionActive = async (option: DeliveryOption) => {
     const headers = authHeaders();
     if (!headers) return;
+    setError('');
 
     const res = await fetch(`${API_BASE}/admin/delivery-options/${option.id}`, {
       method: 'PUT',
@@ -200,7 +224,7 @@ export default function AdminRentals() {
     if (res.ok) {
       fetchAll();
     } else {
-      setError('Failed to update delivery option');
+      setError(await describeError(res, 'Failed to update delivery option'));
     }
   };
 
@@ -242,8 +266,10 @@ export default function AdminRentals() {
               <h2 className="text-lg font-semibold text-slate-900">Blocked Dates ({blockedDates.length})</h2>
             </div>
             <div className="max-h-[420px] overflow-y-auto">
-              {blockedDates.length === 0 ? (
-                <p className="px-6 py-8 text-center text-slate-500">No dates blocked.</p>
+              {loading ? (
+                <p className="px-6 py-8 text-center text-slate-500">Loading...</p>
+              ) : blockedDates.length === 0 ? (
+                <p className="px-6 py-8 text-center text-slate-500">No dates blocked. The calendar is wide open.</p>
               ) : (
                 <ul className="divide-y divide-slate-200">
                   {[...blockedDates].sort((a, b) => a.date.localeCompare(b.date)).map((b) => (
@@ -363,8 +389,12 @@ export default function AdminRentals() {
             </form>
           )}
 
-          {deliveryOptions.length === 0 ? (
-            <p className="px-6 py-8 text-center text-slate-500">No delivery options yet.</p>
+          {loading ? (
+            <p className="px-6 py-8 text-center text-slate-500">Loading...</p>
+          ) : deliveryOptions.length === 0 ? (
+            <p className="px-6 py-8 text-center text-slate-500">
+              No delivery options yet. Customers won&apos;t see any fulfillment choices on the booking form until you add one.
+            </p>
           ) : (
             <ul className="divide-y divide-slate-200">
               {deliveryOptions.map((option) => (

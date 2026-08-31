@@ -53,6 +53,8 @@ export default function AdminProducts() {
   const [newProduct, setNewProduct] = useState<ProductForm>(emptyForm);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchProducts();
@@ -61,6 +63,17 @@ export default function AdminProducts() {
   const authHeaders = () => {
     const token = getAdminToken();
     return token ? { Authorization: `Bearer ${token}` } : null;
+  };
+
+  /** Pulls the backend's own error message out of a failed response instead
+   * of always showing a generic "Failed to X" string. */
+  const describeError = async (res: Response, fallback: string) => {
+    try {
+      const body = await res.json();
+      return body.error || fallback;
+    } catch {
+      return fallback;
+    }
   };
 
   const fetchProducts = async () => {
@@ -73,10 +86,12 @@ export default function AdminProducts() {
       if (response.ok) {
         const data = await response.json();
         setProducts(data.products || []);
+      } else {
+        setError(await describeError(response, 'Failed to load products'));
       }
     } catch (err) {
       console.error('Failed to fetch products:', err);
-      setError('Failed to load products');
+      setError('Could not reach the server. Check your connection and try refreshing.');
     } finally {
       setLoading(false);
     }
@@ -109,6 +124,8 @@ export default function AdminProducts() {
 
   const handleSaveEdit = async () => {
     if (!editData || !editingId) return;
+    setError('');
+    setSaving(true);
 
     try {
       const headers = authHeaders();
@@ -126,15 +143,19 @@ export default function AdminProducts() {
         setEditData(null);
         fetchProducts();
       } else {
-        setError('Failed to update product');
+        setError(await describeError(response, 'Failed to update product'));
       }
     } catch (err) {
-      setError('Error updating product');
+      setError('Could not reach the server. Check your connection and try again.');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this product?')) return;
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Delete "${name}"? This can't be undone - it will disappear from the site immediately.`)) return;
+    setError('');
+    setDeletingId(id);
 
     try {
       const headers = authHeaders();
@@ -149,10 +170,12 @@ export default function AdminProducts() {
         setSuccess('Product deleted successfully');
         fetchProducts();
       } else {
-        setError('Failed to delete product');
+        setError(await describeError(response, 'Failed to delete product'));
       }
     } catch (err) {
-      setError('Error deleting product');
+      setError('Could not reach the server. Check your connection and try again.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -166,6 +189,7 @@ export default function AdminProducts() {
       return;
     }
 
+    setSaving(true);
     try {
       const headers = authHeaders();
       if (!headers) return;
@@ -182,10 +206,12 @@ export default function AdminProducts() {
         setShowAddForm(false);
         fetchProducts();
       } else {
-        setError('Failed to add product');
+        setError(await describeError(response, 'Failed to add product'));
       }
     } catch (err) {
-      setError('Error adding product');
+      setError('Could not reach the server. Check your connection and try again.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -279,9 +305,10 @@ export default function AdminProducts() {
               </label>
               <button
                 type="submit"
-                className="col-span-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
+                disabled={saving}
+                className="col-span-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition disabled:opacity-60"
               >
-                Add Product
+                {saving ? 'Adding...' : 'Add Product'}
               </button>
             </form>
           </div>
@@ -372,14 +399,16 @@ export default function AdminProducts() {
                             <div className="flex gap-2">
                               <button
                                 onClick={handleSaveEdit}
-                                className="text-green-600 hover:text-green-800"
+                                disabled={saving}
+                                className="text-green-600 hover:text-green-800 disabled:opacity-50"
                                 title="Save"
                               >
                                 <Check size={18} />
                               </button>
                               <button
                                 onClick={() => setEditingId(null)}
-                                className="text-slate-600 hover:text-slate-800"
+                                disabled={saving}
+                                className="text-slate-600 hover:text-slate-800 disabled:opacity-50"
                                 title="Cancel"
                               >
                                 <X size={18} />
@@ -402,14 +431,16 @@ export default function AdminProducts() {
                             <div className="flex gap-3">
                               <button
                                 onClick={() => handleEdit(product)}
-                                className="text-blue-600 hover:text-blue-800"
+                                disabled={deletingId === product.id}
+                                className="text-blue-600 hover:text-blue-800 disabled:opacity-50"
                                 title="Edit"
                               >
                                 <Edit2 size={18} />
                               </button>
                               <button
-                                onClick={() => handleDelete(product.id)}
-                                className="text-red-600 hover:text-red-800"
+                                onClick={() => handleDelete(product.id, product.name)}
+                                disabled={deletingId === product.id}
+                                className="text-red-600 hover:text-red-800 disabled:opacity-50"
                                 title="Delete"
                               >
                                 <Trash2 size={18} />

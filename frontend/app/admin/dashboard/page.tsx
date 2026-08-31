@@ -26,6 +26,7 @@ export default function AdminDashboard() {
   const [username, setUsername] = useState('');
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [statsError, setStatsError] = useState('');
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
 
@@ -76,11 +77,12 @@ export default function AdminDashboard() {
         const data = await response.json();
         setStats(data);
       } else {
-        const error = await response.json();
-        console.error('Stats error:', error);
+        const body = await response.json().catch(() => ({}));
+        setStatsError(body.error || 'Failed to load dashboard stats');
       }
     } catch (error) {
       console.error('Failed to fetch stats:', error);
+      setStatsError('Could not reach the server. Check your connection and try refreshing.');
     } finally {
       setLoading(false);
     }
@@ -93,6 +95,10 @@ export default function AdminDashboard() {
           <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
           <p className="text-slate-600 mt-2">Welcome, <span className="font-semibold">{username}</span></p>
         </div>
+
+        {statsError && (
+          <div className="p-4 rounded bg-red-50 border border-red-200 text-red-700">{statsError}</div>
+        )}
 
         {/* Dashboard Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

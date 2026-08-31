@@ -46,6 +46,17 @@ export default function AdminSettings() {
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [isChanging, setIsChanging] = useState(false);
 
+  /** Pulls the backend's own error message out of a failed response instead
+   * of always showing a generic "Failed to X" string. */
+  const describeError = async (res: Response, fallback: string) => {
+    try {
+      const body = await res.json();
+      return body.error || fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
   useEffect(() => {
     (async () => {
       try {
@@ -64,9 +75,12 @@ export default function AdminSettings() {
             hero_heading: data.hero_heading || '',
             hero_subheading: data.hero_subheading || '',
           });
+        } else {
+          setSettingsError(await describeError(res, 'Failed to load settings'));
         }
       } catch (err) {
         console.error('Failed to load settings:', err);
+        setSettingsError('Could not reach the server. Check your connection and try refreshing.');
       } finally {
         setSettingsLoading(false);
       }
@@ -81,7 +95,7 @@ export default function AdminSettings() {
     try {
       const token = getAdminToken();
       if (!token) {
-        setSettingsError('Not authenticated');
+        setSettingsError('Not authenticated - try logging in again.');
         return;
       }
 
@@ -95,13 +109,13 @@ export default function AdminSettings() {
       });
 
       if (!response.ok) {
-        setSettingsError('Failed to save settings');
+        setSettingsError(await describeError(response, 'Failed to save settings'));
         return;
       }
 
       setSettingsSuccess('Settings saved successfully!');
     } catch (err) {
-      setSettingsError('An error occurred while saving settings');
+      setSettingsError('Could not reach the server. Check your connection and try again.');
     } finally {
       setSettingsSaving(false);
     }
@@ -154,7 +168,7 @@ export default function AdminSettings() {
       setNewPassword('');
       setConfirmPassword('');
     } catch (error) {
-      setPasswordError('An error occurred while changing password');
+      setPasswordError('Could not reach the server. Check your connection and try again.');
     } finally {
       setIsChanging(false);
     }
@@ -368,6 +382,16 @@ export default function AdminSettings() {
             </p>
           </div>
           <div className="px-6 py-6 space-y-4">
+            {settingsError && (
+              <div className="p-3 rounded bg-red-50 border border-red-200 text-red-700 text-sm">
+                {settingsError}
+              </div>
+            )}
+            {settingsSuccess && (
+              <div className="p-3 rounded bg-green-50 border border-green-200 text-green-700 text-sm">
+                {settingsSuccess}
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Eyebrow (small label above the heading)

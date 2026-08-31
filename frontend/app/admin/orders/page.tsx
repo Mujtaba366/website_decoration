@@ -31,10 +31,22 @@ export default function AdminOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const authHeaders = () => {
     const token = getAdminToken();
     return token ? { Authorization: `Bearer ${token}` } : null;
+  };
+
+  /** Pulls the backend's own error message out of a failed response instead
+   * of always showing a generic "Failed to X" string. */
+  const describeError = async (res: Response, fallback: string) => {
+    try {
+      const body = await res.json();
+      return body.error || fallback;
+    } catch {
+      return fallback;
+    }
   };
 
   const fetchOrders = async () => {
@@ -47,11 +59,11 @@ export default function AdminOrders() {
         const data = await res.json();
         setOrders(data.orders || []);
       } else {
-        setError('Failed to load orders');
+        setError(await describeError(res, 'Failed to load orders'));
       }
     } catch (err) {
       console.error('Failed to fetch orders:', err);
-      setError('Failed to load orders');
+      setError('Could not reach the server. Check your connection and try refreshing.');
     } finally {
       setLoading(false);
     }
@@ -64,6 +76,8 @@ export default function AdminOrders() {
   const handleStatusChange = async (orderId: string, status: string) => {
     const headers = authHeaders();
     if (!headers) return;
+    setError('');
+    setSuccess('');
 
     const res = await fetch(`${API_BASE}/admin/orders/${orderId}`, {
       method: 'PUT',
@@ -71,9 +85,10 @@ export default function AdminOrders() {
       body: JSON.stringify({ status }),
     });
     if (res.ok) {
+      setSuccess('Order status updated');
       fetchOrders();
     } else {
-      setError('Failed to update order status');
+      setError(await describeError(res, 'Failed to update order status'));
     }
   };
 
@@ -102,6 +117,9 @@ export default function AdminOrders() {
 
         {error && (
           <div className="p-4 rounded bg-red-50 border border-red-200 text-red-700">{error}</div>
+        )}
+        {success && (
+          <div className="p-4 rounded bg-green-50 border border-green-200 text-green-700">{success}</div>
         )}
 
         <div className="bg-white rounded-lg shadow">
