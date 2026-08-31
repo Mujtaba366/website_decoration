@@ -106,13 +106,114 @@ None of these crashed (no 500/debugger), but the first three broke the API's own
 
 All of the above has passing regression tests (see R2-2).
 
-### [R2-4] Still in progress this round
+### [R2-4] Admin UX depth pass (priority 4)
 
-Admin UX depth pass (loading states, specific error messages, confirm dialogs on
-destructive actions, empty states, mobile layout) and continuing the DB-driven
-content customization from round one (about page / how-it-works copy) - see the log
-entries below this line as they land, and the final summary at the very bottom for
-what actually got done vs. deferred again.
+Went through every admin page (dashboard, products, orders, rentals, settings) with
+the same checklist:
+
+- **Real error messages.** Every page had generic strings like "Failed to update
+  product" regardless of why. Added a small `describeError()` helper (reads
+  `body.error` from the failed response) to each page, so the specific backend
+  message now surfaces - e.g. "That date is already blocked" instead of "Failed to
+  block date", "Missing required field(s): event_date" instead of a silent no-op.
+  Network failures (server unreachable) get their own distinct wording so it's
+  obvious the problem isn't "you did something wrong."
+- **Confirmation on destructive actions.** Product delete already had this. Added it
+  to the Rentals page's list-based "unblock a date" action (names the date, extra
+  wording if it's linked to a booking) - this had briefly lost its confirmation
+  earlier in the session as a workaround for the sandboxed test browser not
+  supporting `confirm()`; restored now that it's confirmed working normally, and
+  verified both the decline path (nothing happens) and the confirm path (date
+  actually unblocks) live.
+- **Loading states.** Rentals page's Blocked Dates and Delivery Options lists would
+  flash their "no data" empty state before the first fetch completed - same bug
+  class as the `useApi` fix, just hand-rolled fetch logic instead of the shared
+  hook. Added proper loading guards.
+- **In-flight protection.** Product add/edit/delete buttons now disable themselves
+  while their request is running, so a double-click can't fire two overlapping
+  requests.
+- **Dashboard and Settings previously swallowed load failures** (console.error only,
+  leaving stats as "-" or the settings form blank with zero explanation). Both now
+  show a visible error banner.
+
+Verified live for real (not just read the code): created and deleted a test product
+through the actual confirm dialog (checked both the decline-does-nothing path and the
+confirm-actually-deletes path via the dialog's message text), blocked/unblocked a
+date on the calendar and via the list's confirm dialog, changed an order status and
+saw the success message. All test data cleaned up / reverted afterward. Full
+production build and the 37-test backend suite both pass after this batch.
+
+### [R2-5] Continuing DB-driven content customization (priority 1 + 4)
+
+Extended the hero pattern from round one to the About page: `site_settings` gained
+`about_heading`/`about_subheading`/`about_story` (additive migration, defaults equal
+to the exact previously-hardcoded copy). The three story paragraphs are one textarea
+in the admin (split on blank lines to render), not one column each - enough to be
+useful without turning this into a full page-builder in a single sitting. The "Hi,
+we're Bloom & Vow" line now also pulls the site name from settings instead of
+hardcoding it a second time elsewhere on the same page.
+
+Deliberately did **not** extend this to the About page's "Values" grid (4 icon/title/
+description cards) or the How It Works page's 4 steps - picked the single most
+substantial editable block per page rather than making every hardcoded string on the
+site dynamic in one pass. If this keeps being useful, those are the natural next
+targets, same pattern each time.
+
+Verified live: About page renders identically before any edit; edited the heading
+through the new admin card, confirmed the DB updated and the live page reflected it
+immediately, reverted back to original copy afterward.
+
+## Round two summary
+
+All 5 round-two priorities got a real pass, verified rather than assumed:
+
+1. **Worked through round one's deferred items** - the About page content
+   customization (this round's [R2-5]). True DB transactions for booking creation
+   remain out of scope (would need a Postgres RPC function - more infrastructure
+   than "no new installs/ports" allows building carelessly at 3am; noted, not
+   attempted, matches round one's own call on this).
+2. **Automated tests added from zero** - 37 backend tests (`unittest` + Flask's own
+   test client, no new dependency) and 7 frontend tests (Node's built-in `node:test`,
+   confirmed empirically that Node 22+ runs `.ts` files with simple type annotations
+   directly before relying on it). Both suites run clean; commands are in each
+   section above and in the repo (`npm test` in `frontend/`, the unittest discover
+   command in `backend/tests/`).
+3. **Correctness sweep finished** - found and fixed the `useApi` loading-state bug,
+   the five `update_*` 404-vs-200-null bug, two unused imports, and flagged (without
+   guessing at a fix) the Auckland-postcode-range data concern.
+4. **Admin UX depth** - real error messages everywhere, confirmations restored,
+   loading states fixed, in-flight double-submit protection, plus the About page
+   customization work.
+5. **Flask resilience** - timeouts on every Supabase call, clean 503s instead of raw
+   connection exceptions, global 400/415 JSON error handlers, required-body/
+   required-field validation on every public create/update endpoint.
+
+### Needs permission / blocked (nothing else came up)
+
+- **Auckland postcode list correctness** (flagged in [R2-1]) - the only concrete item
+  that needs something this round's rules don't allow: an authoritative NZ
+  postcode-to-region source to check the existing `0600`-`2999` range against, which
+  means an external network call. Left as-is, documented in `date-utils.ts` and here.
+  This affects whether a real customer gets charged an out-of-area delivery fee, so
+  it's worth someone (with real NZ Post/postcode data access) checking before this
+  matters for a real booking.
+- Nothing else was blocked. Every other task fit inside file edits, the already-
+  running local dev servers, the already-connected Supabase MCP, and local git.
+
+### Commit log, round two (oldest first)
+
+1. `docs: round two progress checkpoint (sweep, tests, resilience)`
+2. `fix: Flask resilience - timeouts, clean error responses, 404s on missing records`
+3. `test: add backend test suite (unittest + Flask test client, no new deps)`
+4. `fix: useApi loading-state bug; extract+test date-utils (no new deps)`
+5. `feat: admin UX depth pass - real errors, confirmations, loading states`
+6. `feat: make About page story content editable from admin settings`
+
+All local only - no remote configured, nothing pushed. DB row counts and content
+verified back to exact starting state after every test/verification pass (checked
+right before writing this line: products 8, bookings 4, orders 4, messages 3,
+payments 4, blocked_dates 0, delivery_options 2, site_settings 1 - matches both
+round one's and round two's starting baseline).
 
 ---
 
