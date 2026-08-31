@@ -17,6 +17,19 @@ register_routes(app)
 def health():
     return jsonify({'status': 'ok', 'message': 'Backend is running'}), 200
 
+@app.errorhandler(400)
+def bad_request(error):
+    # Without this handler, a malformed/empty JSON body makes Flask's
+    # request.get_json() raise before a view function's own try/except ever
+    # runs, and the default response is an HTML error page - inconsistent
+    # with every other error response this API returns.
+    return jsonify({'error': 'The request body could not be parsed as JSON.'}), 400
+
+@app.errorhandler(415)
+def unsupported_media_type(error):
+    # Same story as above, but for a request missing Content-Type: application/json.
+    return jsonify({'error': 'Content-Type must be application/json.'}), 415
+
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({'error': 'Not found'}), 404

@@ -4,10 +4,8 @@ Admin dashboard and data endpoints - ALL USE SUPABASE DATABASE
 
 from flask import jsonify, request
 from api.admin_views import verify_admin_token
-from api.session_store import get_all_sessions
 from app.supabase_client import get_supabase_client
 import re
-import uuid
 
 
 def slugify(text):

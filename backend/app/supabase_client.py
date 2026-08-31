@@ -4,14 +4,36 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# How long to wait for Supabase before giving up. Without this, a hung
+# connection to Supabase would hang the Flask request indefinitely.
+REQUEST_TIMEOUT = 10
+
+
 class SupabaseError(Exception):
     """Raised on a non-2xx response from the Supabase REST API. Carries the
     HTTP status code so callers can distinguish e.g. a 409 unique-constraint
-    conflict from other failures without parsing the error message text."""
+    conflict from other failures without parsing the error message text.
+    Also raised (with status_code=503) when Supabase can't be reached at all
+    (DNS failure, connection refused, timeout) - see _request() below."""
     def __init__(self, status_code: int, text: str):
         self.status_code = status_code
         self.text = text
         super().__init__(f'Supabase error: {status_code} - {text}')
+
+
+def _request(method, url, headers, **kwargs):
+    """Shared HTTP call for every table operation. Applies a timeout and
+    turns network-level failures (DNS, connection refused, timeout) into a
+    SupabaseError(503) instead of letting a raw requests exception escape -
+    without this, an unreachable Supabase would surface as a confusing
+    ConnectionError string with the wrong status code."""
+    try:
+        return requests.request(method, url, headers=headers, timeout=REQUEST_TIMEOUT, **kwargs)
+    except requests.exceptions.Timeout:
+        raise SupabaseError(503, 'Timed out waiting for the database. Please try again.')
+    except requests.exceptions.RequestException as e:
+        raise SupabaseError(503, f'Could not reach the database: {e}')
+
 
 class SupabaseClient:
     def __init__(self, url: str, key: str):
@@ -56,7 +78,7 @@ class SupabaseTable:
         if params:
             url += '?' + '&'.join(params)
 
-        response = requests.get(url, headers=self.headers)
+        response = _request('GET', url, self.headers)
 
         class Result:
             def __init__(self, data):
@@ -85,7 +107,7 @@ class SupabaseInsert:
 
     def execute(self):
         url = f'{self.url}/rest/v1/{self.table_name}'
-        response = requests.post(url, headers=self.headers, json=self.data)
+        response = _request('POST', url, self.headers, json=self.data)
 
         class Result:
             def __init__(self, data):
@@ -113,7 +135,7 @@ class SupabaseUpdate:
         if self.filters:
             url += '?' + '&'.join(self.filters)
 
-        response = requests.patch(url, headers=self.headers, json=self.data)
+        response = _request('PATCH', url, self.headers, json=self.data)
 
         class Result:
             def __init__(self, data):
@@ -140,7 +162,7 @@ class SupabaseDelete:
         if self.filters:
             url += '?' + '&'.join(self.filters)
 
-        response = requests.delete(url, headers=self.headers)
+        response = _request('DELETE', url, self.headers)
 
         class Result:
             def __init__(self, data=None):
