@@ -44,3 +44,14 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+
+# Local secrets - never commit
+backend/pass(ignore dont edit)
+
+# Python bytecode anywhere (nested __pycache__ under backend/api, backend/app, etc.)
+**/__pycache__/
+*.pyc
+
+# Root-level venv (if ever created outside backend/)
+/venv/
+
