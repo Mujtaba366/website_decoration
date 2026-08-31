@@ -87,4 +87,7 @@ export interface SiteSettings {
   logo_url: string | null;
   instagram_handle: string | null;
   service_area_note: string | null;
+  hero_eyebrow: string | null;
+  hero_heading: string | null;
+  hero_subheading: string | null;
 }

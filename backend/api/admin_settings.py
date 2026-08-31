@@ -10,6 +10,7 @@ from app.supabase_client import get_supabase_client
 SETTINGS_FIELDS = (
     'site_name', 'tagline', 'support_email', 'phone',
     'location', 'logo_url', 'instagram_handle', 'service_area_note',
+    'hero_eyebrow', 'hero_heading', 'hero_subheading',
 )
 
 

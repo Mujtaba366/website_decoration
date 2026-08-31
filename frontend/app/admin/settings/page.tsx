@@ -14,6 +14,9 @@ interface SiteSettingsForm {
   location: string;
   instagram_handle: string;
   service_area_note: string;
+  hero_eyebrow: string;
+  hero_heading: string;
+  hero_subheading: string;
 }
 
 const emptySettings: SiteSettingsForm = {
@@ -24,6 +27,9 @@ const emptySettings: SiteSettingsForm = {
   location: '',
   instagram_handle: '',
   service_area_note: '',
+  hero_eyebrow: '',
+  hero_heading: '',
+  hero_subheading: '',
 };
 
 export default function AdminSettings() {
@@ -54,6 +60,9 @@ export default function AdminSettings() {
             location: data.location || '',
             instagram_handle: data.instagram_handle || '',
             service_area_note: data.service_area_note || '',
+            hero_eyebrow: data.hero_eyebrow || '',
+            hero_heading: data.hero_heading || '',
+            hero_subheading: data.hero_subheading || '',
           });
         }
       } catch (err) {
@@ -347,6 +356,64 @@ export default function AdminSettings() {
                 </button>
               </form>
             </div>
+          </div>
+        </div>
+
+        {/* Homepage Hero */}
+        <div className="bg-white rounded-lg shadow">
+          <div className="px-6 py-4 border-b border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-900">Homepage Hero</h2>
+            <p className="text-sm text-slate-500 mt-1">
+              The large banner text at the top of the homepage.
+            </p>
+          </div>
+          <div className="px-6 py-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Eyebrow (small label above the heading)
+              </label>
+              <input
+                type="text"
+                placeholder="Auckland Wedding Decorations"
+                value={settings.hero_eyebrow}
+                onChange={(e) => setSettings({ ...settings, hero_eyebrow: e.target.value })}
+                disabled={settingsLoading}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Heading
+              </label>
+              <input
+                type="text"
+                placeholder="Beautiful spaces for your perfect day"
+                value={settings.hero_heading}
+                onChange={(e) => setSettings({ ...settings, hero_heading: e.target.value })}
+                disabled={settingsLoading}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Subheading
+              </label>
+              <textarea
+                placeholder="A sentence or two describing what you offer"
+                value={settings.hero_subheading}
+                onChange={(e) => setSettings({ ...settings, hero_subheading: e.target.value })}
+                disabled={settingsLoading}
+                rows={3}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <button
+              onClick={handleSaveSettings}
+              disabled={settingsLoading || settingsSaving}
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-60"
+            >
+              {settingsSaving ? 'Saving...' : 'Save Changes'}
+            </button>
           </div>
         </div>
       </div>

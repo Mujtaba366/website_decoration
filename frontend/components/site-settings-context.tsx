@@ -13,6 +13,9 @@ const DEFAULT_SETTINGS: SiteSettings = {
   logo_url: null,
   instagram_handle: '@bloomandvow',
   service_area_note: 'We deliver and set up across Auckland, or you can pick it up yourself.',
+  hero_eyebrow: 'Auckland Wedding Decorations',
+  hero_heading: 'Beautiful spaces for your perfect day',
+  hero_subheading: 'Stunning floral arches, backdrops, and table settings for rent. Personalized keepsakes for your wedding. We set it up — you say "I do."',
 };
 
 const SiteSettingsContext = createContext<SiteSettings>(DEFAULT_SETTINGS);

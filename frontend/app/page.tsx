@@ -9,9 +9,11 @@ import { useApi } from '@/hooks/use-api';
 import { productsAPI } from '@/lib/api-client';
 import type { Product } from '@/lib/types';
 import { ProductCard } from '@/components/product-card';
+import { useSiteSettings } from '@/components/site-settings-context';
 
 export default function Home() {
   const { data: allProducts = [], loading } = useApi(() => productsAPI.list(), []);
+  const { hero_eyebrow, hero_heading, hero_subheading } = useSiteSettings();
 
   // Get first 6 featured products
   const featured = Array.isArray(allProducts) ? allProducts.slice(0, 6) : [];
@@ -31,14 +33,13 @@ export default function Home() {
         <div className="relative z-10 flex h-full flex-col items-center justify-center text-center px-4">
           <div className="animate-fade-in-up">
             <p className="text-blush-200 text-sm md:text-base font-medium tracking-[0.3em] uppercase mb-4">
-              Auckland Wedding Decorations
+              {hero_eyebrow}
             </p>
             <h1 className="font-serif text-5xl md:text-7xl lg:text-8xl font-semibold text-white text-balance max-w-4xl leading-[1.1]">
-              Beautiful spaces for your perfect day
+              {hero_heading}
             </h1>
             <p className="mt-6 text-lg md:text-xl text-white/90 max-w-2xl mx-auto leading-relaxed">
-              Stunning floral arches, backdrops, and table settings for rent.
-              Personalized keepsakes for your wedding. We set it up — you say &ldquo;I do.&rdquo;
+              {hero_subheading}
             </p>
             <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/rentals">
