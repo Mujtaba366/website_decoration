@@ -1,5 +1,11 @@
 # Overnight work log
 
+**Status as of this writing: all 5 stated priorities have a first pass done and
+verified. Tree is committed, builds clean, DB is back to its exact starting row
+counts and values.** See "What's left / natural next steps" at the bottom for what
+wasn't attempted and why.
+
+
 Working unattended per standing instructions. Local commits only — no push, no remote,
 no deploy, no new installs/servers/ports/network calls beyond what was already used
 earlier in this session. Conservative/reversible choices only; logged below as I go.
@@ -239,4 +245,67 @@ tomorrow: **an admin session does not survive a backend restart** (sessions are
 in-memory only, nothing persisted) - this is pre-existing behavior, not something
 introduced tonight, and matches the plaintext-password/dev-mode posture already
 signed off on.
+
+### [6] Admin polish pass + final build verification
+
+Grepped for more of the same dead-handler shape across every remaining page (about,
+shop, admin login, admin layout) - about and shop pages are static/clean, no forms,
+nothing to fix. Found and cleaned up in the admin login page: leftover `console.log`
+tracing on every login attempt (including logging a 20-character prefix of the
+session token to the browser console - low severity but sloppy) and a dead
+commented-out JSX block referencing a `tapeRows` variable that doesn't exist anywhere
+in the file (a decorative "ledger tape" panel that was never finished - removed
+rather than implemented with fake data, since a fabricated "System status: Balanced"
+indicator on a login screen felt more misleading than helpful). Same console.log
+cleanup on the dashboard's stats fetch. Kept every legitimate `console.error` on
+actual failure paths.
+
+**Final build verification** (hadn't been done yet tonight - typecheck alone doesn't
+catch everything a real build does): ran `npm run build` in `frontend/`. Compiled
+successfully, all 16 routes generated (14 static, 1 dynamic for `/products/[slug]`,
+plus the 404 page), no errors. Confirmed the dev server was still serving correctly
+afterward (`/rentals` loaded fine).
+
+**Final DB check**: `list_tables` row counts match the exact baseline from the start
+of this session across every table (products 8, bookings 4, orders 4, messages 3,
+payments 4, admin_users 1, blocked_dates 0, delivery_options 2, site_settings 1), and
+`site_settings` content (including the new hero fields) matches the original seeded
+defaults exactly. Every piece of test data created during tonight's verification
+passes was deleted or reverted afterward - nothing was left behind, and per the "no
+destructive operations" rule, nothing that existed *before* tonight was ever deleted.
+
+## What's left / natural next steps (not attempted, and why)
+
+- **About page / How It Works steps / other long-form copy** are still hardcoded.
+  The hero was the highest-visibility, most-requested-feeling piece of homepage copy
+  to make editable and got done; going further into full multi-paragraph content
+  editing is a bigger CMS-shaped feature that deserves its own pass rather than being
+  squeezed in as an afterthought tonight.
+- **True DB transactions for booking creation** - noted in section [4]. The current
+  "claim, then create, then link, with manual rollback on failure" approach closes
+  the actual race condition but is still 3 separate network calls, not one atomic
+  unit. A Postgres RPC function via Supabase would be the proper fix.
+- **Everything in SECURITY_DEBT.md** - explicitly not acted on per instructions.
+  Highest-value item if it's ever picked up: the unauthenticated
+  `/api/admin/debug/sessions` endpoint (item 4) - a 5-minute fix (delete the route or
+  add the same auth check every other admin route already has) with no design
+  tradeoffs, unlike the RLS question which needs real thought.
+- **Needs permission / blocked**: nothing hit this tonight. Every task fit inside
+  file edits, the already-running local dev servers, the already-connected Supabase
+  MCP, and local git - no new installs, ports, servers, or external calls were
+  needed for anything on the list.
+
+## Commit log from tonight (oldest first)
+
+1. `chore: restore root .gitignore for backend secrets`
+2. `chore: remove legacy Django backend and Vite admin frontend`
+3. `feat: Flask backend + Next.js storefront and admin`
+4. `fix: wire up remaining dead contact/enquiry forms, fix phantom revenue stat`
+5. `feat: real admin Orders page + dashboard recent orders`
+6. `fix: close booking race condition, surface conflicts on the calendar`
+7. `feat: make homepage hero content editable from admin settings`
+8. `docs: security debt inventory (documentation only, no fixes)`
+9. `chore: clean up debug console noise and dead code in admin`
+
+All local only - no remote configured, nothing pushed.
 
