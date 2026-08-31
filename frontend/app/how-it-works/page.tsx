@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-// import { supabase } from '@/lib/supabase/client';
+import { messagesAPI } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,27 +16,27 @@ export default function HowItWorksPage() {
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // const handleSubmit = async () => {
-  //   if (!name || !email || !message) {
-  //     toast.error('Please fill in all fields.');
-  //     return;
-  //   }
-  //   setSubmitting(true);
-  //   const { error } = await supabase.from('messages').insert({
-  //     sender_name: name,
-  //     content: `${email}: ${message}`,
-  //   });
-  //   if (error) {
-  //     toast.error('Something went wrong. Please try again.');
-  //     setSubmitting(false);
-  //     return;
-  //   }
-  //   toast.success('Thanks for your message! We\'ll get back to you soon.');
-  //   setName('');
-  //   setEmail('');
-  //   setMessage('');
-  //   setSubmitting(false);
-  // };
+  const handleSubmit = async () => {
+    if (!name || !email || !message) {
+      toast.error('Please fill in all fields.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await messagesAPI.create({
+        sender_name: name,
+        content: `${email}: ${message}`,
+      });
+      toast.success('Thanks for your message! We\'ll get back to you soon.');
+      setName('');
+      setEmail('');
+      setMessage('');
+    } catch (err: any) {
+      toast.error(err?.message || 'Something went wrong. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const steps = [
     {
@@ -182,9 +182,11 @@ export default function HowItWorksPage() {
                 <Label htmlFor="hiw-msg" className="mb-1.5 block">Message</Label>
                 <Textarea id="hiw-msg" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Tell us about your wedding..." rows={4} />
               </div>
-              <Button 
-              //  onClick={handleSubmit}
-               disabled={submitting} className="w-full bg-sage-700 hover:bg-sage-800 text-white">
+              <Button
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="w-full bg-sage-700 hover:bg-sage-800 text-white"
+              >
                 {submitting ? 'Sending...' : 'Send Message'}
               </Button>
             </div>

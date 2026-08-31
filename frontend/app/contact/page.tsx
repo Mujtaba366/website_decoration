@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-// import { supabase } from '@/lib/supabase/client';
+import { messagesAPI } from '@/lib/api-client';
+import { useSiteSettings } from '@/components/site-settings-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,34 +12,35 @@ import { Mail, Phone, MapPin, Instagram, Send } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ContactPage() {
+  const { support_email, phone, location, instagram_handle } = useSiteSettings();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // const handleSubmit = async () => {
-  //   if (!name || !email || !message) {
-  //     toast.error('Please fill in your name, email, and message.');
-  //     return;
-  //   }
-  //   setSubmitting(true);
-  //   const { error } = await supabase.from('messages').insert({
-  //     sender_name: name,
-  //     content: `${email} | ${subject || 'No subject'}: ${message}`,
-  //   });
-  //   if (error) {
-  //     toast.error('Something went wrong. Please try again.');
-  //     setSubmitting(false);
-  //     return;
-  //   }
-  //   toast.success('Message sent! We\'ll get back to you within 24 hours.');
-  //   setName('');
-  //   setEmail('');
-  //   setSubject('');
-  //   setMessage('');
-  //   setSubmitting(false);
-  // };
+  const handleSubmit = async () => {
+    if (!name || !email || !message) {
+      toast.error('Please fill in your name, email, and message.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await messagesAPI.create({
+        sender_name: name,
+        content: `${email} | ${subject || 'No subject'}: ${message}`,
+      });
+      toast.success('Message sent! We\'ll get back to you within 24 hours.');
+      setName('');
+      setEmail('');
+      setSubject('');
+      setMessage('');
+    } catch (err: any) {
+      toast.error(err?.message || 'Something went wrong. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div>
@@ -74,11 +76,11 @@ export default function ContactPage() {
 
             <div className="space-y-4">
               {[
-                { icon: Mail, label: 'Email', value: 'hello@bloomandvow.co.nz' },
-                { icon: Phone, label: 'Phone', value: '021 123 4567' },
-                { icon: MapPin, label: 'Location', value: 'Auckland, New Zealand' },
-                { icon: Instagram, label: 'Instagram', value: '@bloomandvow' },
-              ].map((item, i) => (
+                { icon: Mail, label: 'Email', value: support_email },
+                { icon: Phone, label: 'Phone', value: phone },
+                { icon: MapPin, label: 'Location', value: location },
+                { icon: Instagram, label: 'Instagram', value: instagram_handle },
+              ].filter((item) => item.value).map((item, i) => (
                 <div key={i} className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-full bg-sage-100 flex items-center justify-center flex-shrink-0">
                     <item.icon className="h-4 w-4 text-sage-700" />
@@ -112,9 +114,11 @@ export default function ContactPage() {
                   <Label htmlFor="c-msg" className="mb-1.5 block">Message</Label>
                   <Textarea id="c-msg" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Tell us about your wedding or ask us anything..." rows={5} />
                 </div>
-                <Button 
-                  // onClick={handleSubmit} 
-                  disabled={submitting} className="w-full bg-sage-700 hover:bg-sage-800 text-white">
+                <Button
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="w-full bg-sage-700 hover:bg-sage-800 text-white"
+                >
                   {submitting ? 'Sending...' : <>Send Message <Send className="ml-2 h-4 w-4" /></>}
                 </Button>
               </div>

@@ -70,10 +70,12 @@ def get_dashboard_stats():
             print(f"DEBUG: Failed to get pending orders: {e}")
             pending_orders = 0
 
-        # Get total revenue (sum of completed orders)
+        # Get total revenue (sum of paid/fulfilled orders - 'completed' is not a
+        # valid orders.status value, so that never matched anything)
         try:
-            completed = supabase.table('orders').select('total').eq('status', 'completed').execute()
-            total_revenue = sum([o.get('total', 0) for o in (completed.data or [])])
+            paid = supabase.table('orders').select('total').eq('status', 'paid').execute()
+            fulfilled = supabase.table('orders').select('total').eq('status', 'fulfilled').execute()
+            total_revenue = sum(float(o.get('total', 0)) for o in (paid.data or []) + (fulfilled.data or []))
         except Exception as e:
             print(f"DEBUG: Failed to get revenue: {e}")
             total_revenue = 0
