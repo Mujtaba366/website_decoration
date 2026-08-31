@@ -1,5 +1,54 @@
 # Overnight work log
 
+## STOP / shutdown record (read this first)
+
+Told to stop immediately so the machine could go quiet - this section is that
+wrap-up, written before the machine was put to sleep.
+
+**State at stop time: clean. Nothing was mid-edit, nothing was abandoned
+half-finished, nothing was reverted.** The last piece of round two work (About page
+content customization, see "Round two" below) had already been finished, verified
+live in the browser, reverted back to baseline data, and committed *before* the stop
+instruction arrived. When the stop instruction came in, `git status` showed only the
+one pre-existing unrelated file that was never touched all session
+(`.claude/settings.local.json` - a Claude Code permissions-list file, not app code).
+
+What was done in response to the stop instruction itself:
+1. Checked `git status` - confirmed no half-finished edit existed anywhere.
+2. Nothing to revert (see above).
+3. Ran `npm run build` in `frontend/` one more time - passed clean, all 16 routes.
+4. Checked for running dev servers (`preview_list` showed none active - they'd
+   already been stopped at the end of round two) and checked `netstat`/`tasklist`
+   directly for anything still listening on ports 3000/5000 or any stray
+   node.exe/python.exe process - found nothing. The machine was not actually running
+   any of my dev servers at the moment the stop instruction arrived.
+5. Nothing new to commit (see #1) - the tree was already fully committed.
+6. This note.
+7. Sleep command runs immediately after this file is saved and committed - see the
+   very end of this entry for exactly what was run.
+
+**If it still felt like the machine was making noise/working** right when the stop
+instruction came in, it wasn't a leftover dev server or background process from this
+session - there wasn't one running. It may have been the build check in step 3
+above (a `next build` briefly uses real CPU, finishes in well under a minute) or
+something unrelated to this session entirely.
+
+### What to check when you're back
+
+Nothing is broken or waiting on you from an in-progress-work standpoint - round two
+finished cleanly before this stop instruction arrived. The one substantive thing
+worth your attention is in round two's "Needs permission / blocked" section below:
+the Auckland postcode list used for delivery-fee logic covers a wider range
+(0600-2999) than the real Auckland region, and correcting it needs an authoritative
+NZ postcode source that this session couldn't reach under the no-new-network-calls
+rule. Flagged in `frontend/lib/date-utils.ts` and in round two's notes - not fixed.
+
+Everything else - what got built, what got tested, what's still deferred - is in the
+"Round two" and "Round one" sections below, unchanged from before this stop
+instruction (nothing in them needed correcting).
+
+---
+
 ## Round two (this section first, most recent work; round one log follows below)
 
 Second unattended session, same constraints as round one plus: no new installs, no
