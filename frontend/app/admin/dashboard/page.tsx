@@ -3,6 +3,7 @@
 import { AdminProtectedLayout } from '@/components/admin-protected-layout';
 import { getAdminSession, getAdminToken } from '@/lib/admin-auth';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -13,10 +14,20 @@ interface DashboardStats {
   total_revenue: number;
 }
 
+interface RecentOrder {
+  id: string;
+  customer_name: string;
+  total: number;
+  status: string;
+  created_at: string;
+}
+
 export default function AdminDashboard() {
   const [username, setUsername] = useState('');
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
 
   useEffect(() => {
     const session = getAdminSession();
@@ -25,7 +36,27 @@ export default function AdminDashboard() {
     }
 
     fetchStats();
+    fetchRecentOrders();
   }, []);
+
+  const fetchRecentOrders = async () => {
+    try {
+      const token = getAdminToken();
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE}/admin/orders`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setRecentOrders((data.orders || []).slice(0, 5));
+      }
+    } catch (error) {
+      console.error('Failed to fetch recent orders:', error);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
 
   const fetchStats = async () => {
     try {
@@ -131,12 +162,38 @@ export default function AdminDashboard() {
 
         {/* Recent Orders Section */}
         <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-slate-200">
+          <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
             <h2 className="text-xl font-semibold text-slate-900">Recent Orders</h2>
+            <Link href="/admin/orders" className="text-sm text-blue-600 hover:text-blue-800">
+              View all →
+            </Link>
           </div>
-          <div className="px-6 py-8 text-center">
-            <p className="text-slate-500">No orders yet. Check back soon!</p>
-          </div>
+          {ordersLoading ? (
+            <div className="px-6 py-8 text-center">
+              <p className="text-slate-500">Loading...</p>
+            </div>
+          ) : recentOrders.length === 0 ? (
+            <div className="px-6 py-8 text-center">
+              <p className="text-slate-500">No orders yet. Check back soon!</p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-slate-200">
+              {recentOrders.map((order) => (
+                <li key={order.id} className="px-6 py-3 flex items-center justify-between text-sm">
+                  <div>
+                    <p className="font-medium text-slate-900">{order.customer_name}</p>
+                    <p className="text-slate-400 text-xs">{new Date(order.created_at).toLocaleDateString()}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-slate-900">${Number(order.total).toFixed(2)}</span>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 capitalize">
+                      {order.status}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </AdminProtectedLayout>
