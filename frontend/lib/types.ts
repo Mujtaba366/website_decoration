@@ -24,7 +24,6 @@ export interface CartItem {
   personalization?: string;
 }
 
-export type FulfillmentType = 'setup' | 'pickup';
 export type BookingStatus = 'enquiry' | 'confirmed' | 'paid' | 'completed';
 
 export interface Booking {
@@ -33,7 +32,10 @@ export interface Booking {
   customer_name: string;
   contact: string;
   event_date: string;
-  fulfillment_type: FulfillmentType;
+  // Free text mirroring the chosen delivery option's label - no longer
+  // restricted to 'setup'/'pickup' now that delivery options are admin-configurable.
+  fulfillment_type: string;
+  delivery_option_id: string | null;
   address: string | null;
   is_within_auckland: boolean | null;
   extra_fee: number | null;

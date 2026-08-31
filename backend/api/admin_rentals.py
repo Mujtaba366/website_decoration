@@ -6,7 +6,7 @@ across every rental product rather than per-item.
 
 from flask import jsonify, request
 from api.admin_views import verify_admin_token
-from app.supabase_client import get_supabase_client
+from app.supabase_client import get_supabase_client, SupabaseError
 
 
 def _authorize():
@@ -118,6 +118,11 @@ def create_blocked_date():
         if result.data and len(result.data) > 0:
             return jsonify(result.data[0]), 201
         return jsonify({'error': 'Failed to block date'}), 400
+    except SupabaseError as e:
+        if e.status_code == 409:
+            return jsonify({'error': 'That date is already blocked'}), 409
+        print(f"Create blocked date error: {e}")
+        return jsonify({'error': 'Internal server error', 'details': str(e)}), 500
     except Exception as e:
         print(f"Create blocked date error: {e}")
         return jsonify({'error': 'Internal server error', 'details': str(e)}), 500

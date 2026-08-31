@@ -4,6 +4,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+class SupabaseError(Exception):
+    """Raised on a non-2xx response from the Supabase REST API. Carries the
+    HTTP status code so callers can distinguish e.g. a 409 unique-constraint
+    conflict from other failures without parsing the error message text."""
+    def __init__(self, status_code: int, text: str):
+        self.status_code = status_code
+        self.text = text
+        super().__init__(f'Supabase error: {status_code} - {text}')
+
 class SupabaseClient:
     def __init__(self, url: str, key: str):
         self.url = url.rstrip('/')
@@ -56,7 +65,7 @@ class SupabaseTable:
         if response.status_code == 200:
             return Result(response.json())
         else:
-            raise Exception(f'Supabase error: {response.status_code} - {response.text}')
+            raise SupabaseError(response.status_code, response.text)
 
     def insert(self, data):
         return SupabaseInsert(self.url, self.headers, self.table_name, data)
@@ -85,7 +94,7 @@ class SupabaseInsert:
         if response.status_code in [200, 201]:
             return Result(response.json())
         else:
-            raise Exception(f'Supabase error: {response.status_code} - {response.text}')
+            raise SupabaseError(response.status_code, response.text)
 
 class SupabaseUpdate:
     def __init__(self, url: str, headers: dict, table_name: str, data):
@@ -113,7 +122,7 @@ class SupabaseUpdate:
         if response.status_code == 200:
             return Result(response.json())
         else:
-            raise Exception(f'Supabase error: {response.status_code} - {response.text}')
+            raise SupabaseError(response.status_code, response.text)
 
 class SupabaseDelete:
     def __init__(self, url: str, headers: dict, table_name: str):
@@ -140,7 +149,7 @@ class SupabaseDelete:
         if response.status_code in [200, 204]:
             return Result()
         else:
-            raise Exception(f'Supabase error: {response.status_code} - {response.text}')
+            raise SupabaseError(response.status_code, response.text)
 
 _client = None
 

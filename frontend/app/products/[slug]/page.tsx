@@ -280,6 +280,17 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
       setSelectedDate(undefined);
     } catch (err: any) {
       toast.error(err?.message || 'Something went wrong. Please try again.');
+      // The date may have just been claimed by someone else mid-checkout -
+      // refresh so the calendar reflects reality instead of the user retrying
+      // the same now-blocked date.
+      try {
+        const dates = await blockedDatesAPI.list() as BlockedDate[];
+        const fresh = new Set(dates.map((d) => d.date));
+        setBlockedDates(fresh);
+        if (fresh.has(dateStr)) setSelectedDate(undefined);
+      } catch {
+        // ignore - non-critical refresh
+      }
     } finally {
       setSubmitting(false);
     }

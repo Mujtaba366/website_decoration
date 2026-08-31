@@ -24,6 +24,7 @@ from api.admin_delivery import (
     create_delivery_option, update_delivery_option
 )
 from api.admin_settings import get_settings, update_settings
+from api.admin_orders import get_admin_orders, update_admin_order
 
 def register_routes(app):
     # ==================== ADMIN AUTHENTICATION ====================
@@ -103,6 +104,15 @@ def register_routes(app):
     @app.route('/api/admin/delivery-options/<option_id>', methods=['PUT'])
     def admin_delivery_options_detail(option_id):
         return update_delivery_option(option_id)
+
+    # ==================== ADMIN ORDERS ====================
+    @app.route('/api/admin/orders', methods=['GET'])
+    def admin_orders_list():
+        return get_admin_orders()
+
+    @app.route('/api/admin/orders/<order_id>', methods=['PUT'])
+    def admin_orders_detail(order_id):
+        return update_admin_order(order_id)
 
     # ==================== SITE SETTINGS ====================
     @app.route('/api/settings', methods=['GET'])

@@ -1,5 +1,5 @@
 from flask import jsonify
-from app.supabase_client import get_supabase_client
+from app.supabase_client import get_supabase_client, SupabaseError
 import traceback
 
 def handle_error(error):
@@ -63,24 +63,42 @@ def get_bookings(booking_id=None):
         return handle_error(e)
 
 def create_booking(data):
+    """
+    Claims the date before creating the booking, not after. blocked_dates.date
+    is UNIQUE, so this insert is the actual concurrency guard: two simultaneous
+    requests for the same date will have one succeed and one hit a 409 from
+    Postgres, before either has created a booking row. Creating the booking
+    first (the old order) let two concurrent requests both pass a plain
+    SELECT check and both insert bookings, with only one ever getting a
+    blocked_dates row.
+    """
+    supabase = get_supabase_client()
+    event_date = data.get('event_date')
+    claim = None
+
     try:
-        supabase = get_supabase_client()
-        event_date = data.get('event_date')
-
         if event_date:
-            existing = supabase.table('blocked_dates').select('id').eq('date', event_date).execute().data
-            if existing:
-                return jsonify({'error': 'That date is no longer available'}), 409
+            try:
+                claim = supabase.table('blocked_dates').insert({
+                    'date': event_date,
+                    'reason': f"Booking - {data.get('customer_name', 'customer')}",
+                }).execute().data[0]
+            except SupabaseError as e:
+                if e.status_code == 409:
+                    return jsonify({'error': 'That date is no longer available'}), 409
+                raise
 
-        response = supabase.table('bookings').insert(data).execute()
-        booking = response.data[0]
+        try:
+            booking = supabase.table('bookings').insert(data).execute().data[0]
+        except Exception:
+            # Booking failed after the date was claimed - release it so the
+            # date doesn't stay stuck as blocked with nothing behind it.
+            if claim:
+                supabase.table('blocked_dates').delete().eq('id', claim['id']).execute()
+            raise
 
-        if event_date:
-            supabase.table('blocked_dates').insert({
-                'date': event_date,
-                'reason': f"Booking - {data.get('customer_name', 'customer')}",
-                'booking_id': booking['id'],
-            }).execute()
+        if claim:
+            supabase.table('blocked_dates').update({'booking_id': booking['id']}).eq('id', claim['id']).execute()
 
         return jsonify(booking), 201
     except Exception as e:
