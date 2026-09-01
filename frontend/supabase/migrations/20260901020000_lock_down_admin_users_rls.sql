@@ -1,0 +1,15 @@
+-- RLS lockdown, table 1/10: admin_users has no legitimate anon/authenticated
+-- use at all - the backend now authenticates with the service-role key
+-- (bypasses RLS, see backend/app/supabase_client.py) and does its own auth
+-- via verify_admin_token. Dropping the only remaining policy ("Allow
+-- public read for admin login") removes the ability for anyone with the
+-- anon key to read the plaintext admin password directly from Postgres,
+-- which is exactly what this table's RLS was doing before this change -
+-- confirmed empirically: SELECT with the anon key returned the live
+-- plaintext password before this migration, and returns an empty array
+-- after it.
+--
+-- To roll back:
+--   CREATE POLICY "Allow public read for admin login" ON admin_users
+--     FOR SELECT TO public USING (true);
+DROP POLICY "Allow public read for admin login" ON admin_users;
