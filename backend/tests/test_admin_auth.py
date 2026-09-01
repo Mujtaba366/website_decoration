@@ -115,6 +115,29 @@ class ChangePasswordTests(ApiTestCase):
         self.assertEqual(res.status_code, 401)
 
 
+class DebugSessionsTests(ApiTestCase):
+    """Regression coverage for a real leak: this endpoint used to return
+    live session tokens and admin usernames to anyone, unauthenticated."""
+
+    def test_requires_authentication(self):
+        res = self.client.get('/api/admin/debug/sessions')
+        self.assertEqual(res.status_code, 401)
+
+    def test_rejects_an_invalid_token(self):
+        res = self.client.get('/api/admin/debug/sessions', headers={'Authorization': 'Bearer not-a-real-token'})
+        self.assertEqual(res.status_code, 401)
+
+    def test_authenticated_admin_gets_a_session_count_only(self):
+        token = self.login()
+        res = self.client.get('/api/admin/debug/sessions', headers={'Authorization': f'Bearer {token}'})
+        self.assertEqual(res.status_code, 200)
+        body = res.get_json()
+        self.assertEqual(body['active_sessions'], 1)
+        # Must never again leak raw tokens or the admin username list.
+        self.assertNotIn('sessions', body)
+        self.assertNotIn('admin_users', body)
+
+
 if __name__ == '__main__':
     import unittest
     unittest.main()

@@ -228,13 +228,28 @@ def admin_change_password():
 
 def debug_sessions():
     """
-    DEBUG endpoint - shows all active sessions
+    DEBUG endpoint - shows session count for the authenticated admin.
     GET /api/admin/debug/sessions
+    Header: Authorization: Bearer <token>
+
+    Previously returned live session tokens and admin usernames to anyone,
+    with no auth check at all - a bearer token stolen from this endpoint
+    would grant full admin access. Now requires a valid admin session, and
+    no longer echoes back raw tokens even to an authenticated caller, since
+    there's no legitimate reason a session token needs to be handed out a
+    second time after it's already been issued at login.
     """
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        return jsonify({'error': 'Missing authorization header'}), 401
+
+    token = auth_header[7:]
+    is_valid, _ = verify_admin_token(token)
+    if not is_valid:
+        return jsonify({'error': 'Unauthorized'}), 401
+
     return jsonify({
-        'active_sessions': len(get_all_sessions()),
-        'sessions': list(get_all_sessions().keys())[:5],  # Show first 5 tokens
-        'admin_users': list(ADMIN_USERS.keys())
+        'active_sessions': len(get_all_sessions())
     }), 200
 
 
