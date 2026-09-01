@@ -180,23 +180,44 @@ def admin_change_password():
         if not current_password or not new_password:
             return jsonify({'error': 'Current and new password required'}), 400
 
-        # Get admin user
-        admin_user = ADMIN_USERS.get(session['username'])
+        username = session['username']
 
-        if not admin_user or admin_user['password'] != current_password:
-            return jsonify({'error': 'Current password is incorrect'}), 401
-
-        # Update password in memory
-        admin_user['password'] = new_password
-
-        # Update password in Supabase database
+        # Check the current password against Supabase first, falling back to
+        # the in-memory store - mirrors admin_login()'s own priority. Without
+        # this, changing the password directly in Supabase (which is the
+        # whole point of storing it there in plaintext - so it can be read
+        # and managed from the database) would make this endpoint reject the
+        # correct current password, since it would only ever compare against
+        # the stale in-memory default.
+        verified = False
         try:
             supabase = get_supabase_client()
-            supabase.table('admin_users').update({'password': new_password}).eq('username', session['username']).execute()
-            print(f"DEBUG: Password updated in Supabase for user: {session['username']}")
+            result = supabase.table('admin_users').select('*').eq('username', username).execute()
+            if result.data and result.data[0]['password'] == current_password:
+                verified = True
+        except Exception as db_error:
+            print(f"DEBUG: Supabase lookup failed during password change: {db_error}")
+
+        if not verified:
+            admin_user = ADMIN_USERS.get(username)
+            if admin_user and admin_user['password'] == current_password:
+                verified = True
+
+        if not verified:
+            return jsonify({'error': 'Current password is incorrect'}), 401
+
+        # Update both stores so the next login/change stays consistent
+        # regardless of which one is consulted first.
+        if username in ADMIN_USERS:
+            ADMIN_USERS[username]['password'] = new_password
+
+        try:
+            supabase = get_supabase_client()
+            supabase.table('admin_users').update({'password': new_password}).eq('username', username).execute()
+            print(f"DEBUG: Password updated in Supabase for user: {username}")
         except Exception as db_error:
             print(f"WARNING: Failed to update password in Supabase: {db_error}")
-            # Continue anyway since it was updated in memory
+            # Continue anyway since it was updated in memory (if it existed there)
 
         return jsonify({'message': 'Password changed successfully'}), 200
 
