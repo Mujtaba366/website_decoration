@@ -195,26 +195,42 @@ _client = None
 _admin_client = None
 
 def get_supabase_client() -> SupabaseClient:
+    """Returns the backend's one Supabase client, authenticated with the
+    SERVICE ROLE KEY - not the anon key.
+
+    This changed as part of the RLS lockdown: every table's RLS policy used
+    to be wide open (`anon, authenticated USING (true)`) purely because this
+    function authenticated as anon, and the backend needed to be able to do
+    its own job. Now that RLS is locked down per-table (public tables are
+    anon-SELECT-only; everything else has zero anon/authenticated policies
+    at all - see the individual migrations and SECURITY_DEBT.md), the
+    backend needs a credential that bypasses RLS to keep working, since
+    Flask already does its own authorization (`verify_admin_token` on every
+    admin route, basic validation on public routes) - RLS is not meant to
+    additionally gate the backend's own trusted server-side code, only to
+    stop someone from bypassing Flask and hitting Supabase's REST API
+    directly with a key they found.
+
+    Never expose this client or its key to the frontend or any untrusted
+    context - it can read and write every table unconditionally."""
     global _client
     if _client is None:
         url = os.getenv('SUPABASE_URL')
-        key = os.getenv('SUPABASE_KEY')
+        key = os.getenv('SUPABASE_SERVICE_ROLE_KEY')
         if not url or not key:
-            raise Exception('SUPABASE_URL and SUPABASE_KEY must be set in .env')
+            raise Exception('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in .env')
         _client = SupabaseClient(url, key)
     return _client
 
 
 def get_supabase_admin_client() -> SupabaseClient:
-    """Returns a client authenticated with the service-role key, which
-    bypasses Row Level Security entirely. Every other table in this project
-    uses the anon key with fully-open RLS - this is the one deliberate
-    exception, reserved for the payment_settings table (bank account
-    number, Stripe config), which has RLS enabled with no anon/authenticated
-    policies at all. That table is unreachable with the anon key by design;
-    only code that has gone through this function can read or write it.
-    Do not use this for anything else - reach for get_supabase_client()
-    for every other table."""
+    """Identical to get_supabase_client() as of the RLS lockdown - both now
+    read SUPABASE_SERVICE_ROLE_KEY. Kept as a separate function only because
+    payment_settings.py and stripe_payments.py already called it by this
+    name before the rest of the backend switched over too; merging them is
+    safe to do later but not necessary. Do not reintroduce a
+    distinction between the two - there should only ever be one backend
+    credential now."""
     global _admin_client
     if _admin_client is None:
         url = os.getenv('SUPABASE_URL')
