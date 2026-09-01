@@ -5,7 +5,7 @@ import { getAdminToken } from '@/lib/admin-auth';
 import { useEffect, useMemo, useState } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Trash2, Plus, X } from 'lucide-react';
-import { toDateOnly } from '@/lib/date-utils';
+import { toDateOnly, fromDateOnly } from '@/lib/date-utils';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -96,12 +96,8 @@ export default function AdminRentals() {
     fetchAll();
   }, []);
 
-  const blockedDateSet = useMemo(() => new Set(blockedDates.map((b) => b.date)), [blockedDates]);
   const blockedDateObjs = useMemo(
-    () => blockedDates.map((b) => {
-      const [y, m, d] = b.date.split('-').map(Number);
-      return new Date(y, m - 1, d);
-    }),
+    () => blockedDates.map((b) => fromDateOnly(b.date)),
     [blockedDates]
   );
 

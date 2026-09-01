@@ -166,3 +166,24 @@ export function toDateOnly(d: Date): string {
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
+
+// The inverse of toDateOnly: parses a "YYYY-MM-DD" string into a Date at
+// local midnight on that day. Do not use `new Date(dateStr)` for this -
+// that parses as UTC midnight, which is the same off-by-one-day bug as
+// toISOString() in reverse (a "2026-08-31" blocked date could render as
+// August 30th in a timezone behind UTC, or the reverse ahead of UTC).
+export function fromDateOnly(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+// Whether a rental date is bookable: not in the past, and not already
+// globally blocked (a date blocked for any product blocks it for all of
+// them - see the admin Rentals calendar). `today` is a parameter (not
+// read internally via `new Date()`) specifically so this is testable with
+// a fixed "now" instead of whatever day the test happens to run on.
+export function isDateAvailable(date: Date, blockedDates: Set<string>, today: Date = new Date()): boolean {
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  if (date < startOfToday) return false;
+  return !blockedDates.has(toDateOnly(date));
+}

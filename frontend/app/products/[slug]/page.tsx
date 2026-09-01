@@ -16,7 +16,7 @@ import { Calendar as CalendarIcon, Truck, Package, MapPin, ArrowLeft, Check, Ale
 import { useCart } from '@/components/cart-context';
 import { toast } from 'sonner';
 
-import { isWithinAuckland, toDateOnly } from '@/lib/date-utils';
+import { isWithinAuckland, toDateOnly, isDateAvailable as checkDateAvailable } from '@/lib/date-utils';
 
 export default function ProductPage({ params }: { params: { slug: string } }) {
   const { slug } = params;
@@ -72,13 +72,7 @@ export default function ProductPage({ params }: { params: { slug: string } }) {
     })();
   }, []);
 
-  const isDateAvailable = (date: Date): boolean => {
-    const dateStr = toDateOnly(date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (date < today) return false;
-    return !blockedDates.has(dateStr);
-  };
+  const isDateAvailable = (date: Date): boolean => checkDateAvailable(date, blockedDates);
 
   const outsideAuckland = address.length > 0 && !isWithinAuckland(address);
   const withinAuckland = address.length > 0 && isWithinAuckland(address);

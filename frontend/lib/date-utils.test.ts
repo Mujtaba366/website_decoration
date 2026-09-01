@@ -8,7 +8,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { toDateOnly, isWithinAuckland, AUCKLAND_POSTCODES } from './date-utils.ts';
+import { toDateOnly, fromDateOnly, isDateAvailable, isWithinAuckland, AUCKLAND_POSTCODES } from './date-utils.ts';
 
 describe('toDateOnly', () => {
   test('formats a date using local components, zero-padded', () => {
@@ -44,6 +44,66 @@ describe('toDateOnly', () => {
     // everywhere, which is what actually matters.
     assert.equal(viaToDateOnly, `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
     void viaToISOString; // documented for context, not asserted against directly
+  });
+});
+
+describe('fromDateOnly', () => {
+  test('parses a YYYY-MM-DD string into a local-midnight Date', () => {
+    const d = fromDateOnly('2026-08-31');
+    assert.equal(d.getFullYear(), 2026);
+    assert.equal(d.getMonth(), 7); // 0-indexed
+    assert.equal(d.getDate(), 31);
+    assert.equal(d.getHours(), 0);
+  });
+
+  test('round-trips through toDateOnly unchanged', () => {
+    for (const dateStr of ['2026-01-01', '2026-08-31', '2026-12-25', '2027-02-28']) {
+      assert.equal(toDateOnly(fromDateOnly(dateStr)), dateStr);
+    }
+  });
+
+  test('never delegates to `new Date(dateStr)` (regression guard)', () => {
+    // new Date('2026-08-31') parses as UTC midnight, not local midnight -
+    // the same class of off-by-one-day bug as toISOString(), just in the
+    // opposite direction. Confirm fromDateOnly's result matches local
+    // getters constructed the safe way (new Date(y, m-1, d)), not the
+    // ISO-string constructor.
+    const viaFromDateOnly = fromDateOnly('2026-08-31');
+    const viaSafeConstructor = new Date(2026, 7, 31);
+    assert.equal(viaFromDateOnly.getTime(), viaSafeConstructor.getTime());
+  });
+});
+
+describe('isDateAvailable', () => {
+  const today = new Date(2026, 7, 15); // fixed "now" - 15 August 2026
+
+  test('a future date with nothing blocked is available', () => {
+    assert.equal(isDateAvailable(new Date(2026, 7, 20), new Set(), today), true);
+  });
+
+  test('a past date is never available, blocked or not', () => {
+    assert.equal(isDateAvailable(new Date(2026, 7, 10), new Set(), today), false);
+  });
+
+  test('today itself is available if not blocked (boundary case)', () => {
+    assert.equal(isDateAvailable(new Date(2026, 7, 15), new Set(), today), true);
+  });
+
+  test('a future date that is in the global blocked-dates set is unavailable', () => {
+    const blocked = new Set(['2026-08-20']);
+    assert.equal(isDateAvailable(new Date(2026, 7, 20), blocked, today), false);
+  });
+
+  test('blocking one date does not affect a different date', () => {
+    const blocked = new Set(['2026-08-20']);
+    assert.equal(isDateAvailable(new Date(2026, 7, 21), blocked, today), true);
+  });
+
+  test('defaults `today` to the real current time when not passed explicitly', () => {
+    // Just confirms the default parameter exists and doesn't throw - the
+    // other tests above pin down the actual date-comparison behavior with
+    // an explicit `today` so they aren't flaky based on when they run.
+    assert.doesNotThrow(() => isDateAvailable(new Date(2099, 0, 1), new Set()));
   });
 });
 
