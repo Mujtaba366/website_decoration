@@ -1,11 +1,13 @@
 # Security debt
 
-This is a documentation-only pass. Nothing here has been changed or fixed - it's a
-list of what's insecure right now, why, and roughly how bad it is, so it can be
-tackled deliberately before this site ever handles real customers/payments/traffic.
-The project is explicitly in development and local-only at the moment, which is the
-main mitigating factor for all of this - none of it has been exploited, and the
-exposure window so far is "sits on one laptop," not "sits on the internet."
+This started as a documentation-only pass - a list of what's insecure, why, and how
+bad it is, to be tackled deliberately before this site ever handles real
+customers/payments/traffic. Several items have since been explicitly approved and
+fixed (marked FIXED below with the reasoning and how it was verified); the rest
+remains logged-but-untouched per standing instructions. The project is explicitly in
+development and local-only for what remains, which is the main mitigating factor -
+none of it has been exploited, and the exposure window so far is "sits on one
+laptop," not "sits on the internet."
 
 Ordered roughly by how bad it'd be if this went live as-is today.
 
@@ -150,6 +152,33 @@ real values only in the untracked `backend/.env`. Mentioning it here because it'
 exactly the kind of mistake that's easy to reintroduce: if `backend/.env` is ever
 copied into a new `.env.example` "for reference," check it's actually been
 sanitized before it's staged.
+
+## 8. Legacy public bookings/orders/messages/payments routes had no auth at all — FIXED
+
+Found while planning the Stripe receipt work (`Round six`, see `OVERNIGHT_NOTES.md`),
+not previously documented here. `GET`/`PUT`/`DELETE` on `/api/bookings`,
+`/api/orders`, `/api/messages`, and `/api/payments` (list and by-id) had **no
+authentication check at all** - only their `POST` (customer-facing create) was ever
+meant to be public. This is a Flask-application-layer gap, separate from and
+independent of item #1's RLS issue: RLS only closes the "bypass Flask and hit
+Supabase's REST API directly" path, but this hole was reachable by hitting Flask
+exactly as intended - no anon key needed, no bypass required.
+
+**What this meant concretely:** anyone who could reach the backend could run
+`curl http://backend/api/orders` and get every customer's name, contact info, and
+order contents back, unauthenticated. The same for bookings, contact-form messages,
+and payment records. `PUT`/`DELETE` on the same routes meant anyone could also edit
+or delete any of those records by id, again with no token.
+
+**Status: fixed.** Confirmed via grep first that the frontend never calls anything
+but `POST` on these four routes - `.list()`/`.get()`/`.update()`/`.delete()` in
+`frontend/lib/api-client.ts` for `bookingsAPI`/`ordersAPI`/`messagesAPI`/`paymentsAPI`
+are defined but never called from any page or component - so gating the rest behind
+the existing admin-token check had zero functional risk to the live site. Verified
+live: all four create flows still work with no auth; every other method now
+correctly returns 401 without a valid admin token and succeeds with one, with no
+data actually read, modified, or deleted by the unauthenticated attempts tested
+against the real backend.
 
 ## What's *not* debt (deliberate, already-accepted tradeoffs)
 
