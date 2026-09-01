@@ -51,6 +51,13 @@ def update_admin_booking(booking_id):
     PUT /api/admin/bookings/<booking_id>
     Header: Authorization: Bearer <token>
     Body: any subset of { "status", "fulfillment_type", "extra_fee", "message" }
+
+    Setting status to "cancelled" also releases the booking's blocked_dates
+    row, so the date opens back up on the global calendar. Without this, a
+    cancelled booking would keep permanently blocking its date for every
+    rental product with no way to free it short of the separate "unblock"
+    action, which admins cancelling a booking would have no reason to know
+    they also need to do.
     """
     if not _authorize():
         return jsonify({'error': 'Unauthorized'}), 401
@@ -69,10 +76,34 @@ def update_admin_booking(booking_id):
         result = supabase.table('bookings').update(update_data).eq('id', booking_id).execute()
 
         if result.data and len(result.data) > 0:
+            if update_data.get('status') == 'cancelled':
+                supabase.table('blocked_dates').delete().eq('booking_id', booking_id).execute()
             return jsonify(result.data[0]), 200
         return jsonify({'error': 'Booking not found'}), 404
     except Exception as e:
         print(f"Update admin booking error: {e}")
+        return jsonify({'error': 'Internal server error', 'details': str(e)}), 500
+
+
+def delete_admin_booking(booking_id):
+    """
+    DELETE /api/admin/bookings/<booking_id>
+    Header: Authorization: Bearer <token>
+
+    Permanently removes a booking (e.g. a duplicate or test entry), unlike
+    "cancel" which keeps the record for history. Also releases its
+    blocked_dates row, same as cancelling.
+    """
+    if not _authorize():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    try:
+        supabase = get_supabase_client()
+        supabase.table('blocked_dates').delete().eq('booking_id', booking_id).execute()
+        supabase.table('bookings').delete().eq('id', booking_id).execute()
+        return jsonify({'message': 'Booking deleted'}), 200
+    except Exception as e:
+        print(f"Delete admin booking error: {e}")
         return jsonify({'error': 'Internal server error', 'details': str(e)}), 500
 
 

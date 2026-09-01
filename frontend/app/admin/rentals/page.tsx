@@ -17,7 +17,7 @@ interface Booking {
   contact: string;
   event_date: string;
   fulfillment_type: string;
-  status: 'enquiry' | 'confirmed' | 'paid' | 'completed';
+  status: 'enquiry' | 'confirmed' | 'paid' | 'completed' | 'cancelled';
   message: string | null;
 }
 
@@ -37,7 +37,7 @@ interface DeliveryOption {
   sort_order: number;
 }
 
-const STATUS_OPTIONS: Booking['status'][] = ['enquiry', 'confirmed', 'paid', 'completed'];
+const STATUS_OPTIONS: Booking['status'][] = ['enquiry', 'confirmed', 'paid', 'completed', 'cancelled'];
 
 export default function AdminRentals() {
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -48,6 +48,7 @@ export default function AdminRentals() {
   const [success, setSuccess] = useState('');
   const [newOption, setNewOption] = useState({ label: '', description: '', fee: 0 });
   const [showAddOption, setShowAddOption] = useState(false);
+  const [bookingActionId, setBookingActionId] = useState<string | null>(null);
 
   const authHeaders = () => {
     const token = getAdminToken();
@@ -181,6 +182,55 @@ export default function AdminRentals() {
     }
   };
 
+  const handleCancelBooking = async (booking: Booking) => {
+    if (!confirm(`Cancel the booking for ${booking.customer_name} on ${booking.event_date}? This keeps the record but frees up the date on the calendar.`)) return;
+    const headers = authHeaders();
+    if (!headers) return;
+    setError('');
+    setSuccess('');
+    setBookingActionId(booking.id);
+
+    try {
+      const res = await fetch(`${API_BASE}/admin/bookings/${booking.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ status: 'cancelled' }),
+      });
+      if (res.ok) {
+        setSuccess('Booking cancelled and date released');
+        fetchAll();
+      } else {
+        setError(await describeError(res, 'Failed to cancel booking'));
+      }
+    } finally {
+      setBookingActionId(null);
+    }
+  };
+
+  const handleDeleteBooking = async (booking: Booking) => {
+    if (!confirm(`Permanently delete the booking for ${booking.customer_name} on ${booking.event_date}? This cannot be undone and removes the record entirely - use Cancel instead if you want to keep it for history.`)) return;
+    const headers = authHeaders();
+    if (!headers) return;
+    setError('');
+    setSuccess('');
+    setBookingActionId(booking.id);
+
+    try {
+      const res = await fetch(`${API_BASE}/admin/bookings/${booking.id}`, {
+        method: 'DELETE',
+        headers,
+      });
+      if (res.ok) {
+        setSuccess('Booking deleted');
+        fetchAll();
+      } else {
+        setError(await describeError(res, 'Failed to delete booking'));
+      }
+    } finally {
+      setBookingActionId(null);
+    }
+  };
+
   const handleAddOption = async (e: React.FormEvent) => {
     e.preventDefault();
     const headers = authHeaders();
@@ -308,11 +358,12 @@ export default function AdminRentals() {
                     <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Event Date</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Fulfillment</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Status</th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {bookings.map((b) => (
-                    <tr key={b.id} className="hover:bg-slate-50">
+                    <tr key={b.id} className={`hover:bg-slate-50 ${b.status === 'cancelled' ? 'opacity-60' : ''}`}>
                       <td className="px-6 py-4 text-sm text-slate-900">{b.product_name}</td>
                       <td className="px-6 py-4 text-sm text-slate-600">
                         {b.customer_name}
@@ -330,6 +381,28 @@ export default function AdminRentals() {
                             <option key={s} value={s}>{s}</option>
                           ))}
                         </select>
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        <div className="flex items-center gap-3">
+                          {b.status !== 'cancelled' && (
+                            <button
+                              onClick={() => handleCancelBooking(b)}
+                              disabled={bookingActionId === b.id}
+                              className="text-amber-600 hover:text-amber-800 disabled:opacity-50"
+                              title="Cancel booking (keeps record, frees the date)"
+                            >
+                              <X size={16} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeleteBooking(b)}
+                            disabled={bookingActionId === b.id}
+                            className="text-red-600 hover:text-red-800 disabled:opacity-50"
+                            title="Delete booking permanently"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

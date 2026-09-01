@@ -3,6 +3,7 @@
 import { AdminProtectedLayout } from '@/components/admin-protected-layout';
 import { getAdminToken } from '@/lib/admin-auth';
 import { useEffect, useState } from 'react';
+import { Trash2, X } from 'lucide-react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -32,6 +33,7 @@ export default function AdminOrders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [orderActionId, setOrderActionId] = useState<string | null>(null);
 
   const authHeaders = () => {
     const token = getAdminToken();
@@ -89,6 +91,55 @@ export default function AdminOrders() {
       fetchOrders();
     } else {
       setError(await describeError(res, 'Failed to update order status'));
+    }
+  };
+
+  const handleCancelOrder = async (order: Order) => {
+    if (!confirm(`Cancel the order for ${order.customer_name} ($${Number(order.total).toFixed(2)})? This keeps the record for history.`)) return;
+    const headers = authHeaders();
+    if (!headers) return;
+    setError('');
+    setSuccess('');
+    setOrderActionId(order.id);
+
+    try {
+      const res = await fetch(`${API_BASE}/admin/orders/${order.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ status: 'cancelled' }),
+      });
+      if (res.ok) {
+        setSuccess('Order cancelled');
+        fetchOrders();
+      } else {
+        setError(await describeError(res, 'Failed to cancel order'));
+      }
+    } finally {
+      setOrderActionId(null);
+    }
+  };
+
+  const handleDeleteOrder = async (order: Order) => {
+    if (!confirm(`Permanently delete the order for ${order.customer_name} ($${Number(order.total).toFixed(2)})? This cannot be undone - use Cancel instead if you want to keep it for history.`)) return;
+    const headers = authHeaders();
+    if (!headers) return;
+    setError('');
+    setSuccess('');
+    setOrderActionId(order.id);
+
+    try {
+      const res = await fetch(`${API_BASE}/admin/orders/${order.id}`, {
+        method: 'DELETE',
+        headers,
+      });
+      if (res.ok) {
+        setSuccess('Order deleted');
+        fetchOrders();
+      } else {
+        setError(await describeError(res, 'Failed to delete order'));
+      }
+    } finally {
+      setOrderActionId(null);
     }
   };
 
@@ -154,11 +205,12 @@ export default function AdminOrders() {
                     <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Total</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Payment</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Status</th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {orders.map((order) => (
-                    <tr key={order.id} className="hover:bg-slate-50">
+                    <tr key={order.id} className={`hover:bg-slate-50 ${order.status === 'cancelled' ? 'opacity-60' : ''}`}>
                       <td className="px-6 py-4 text-sm text-slate-900">
                         {order.customer_name}
                         <div className="text-xs text-slate-400">{order.contact}</div>
@@ -180,6 +232,28 @@ export default function AdminOrders() {
                             <option key={s} value={s}>{s}</option>
                           ))}
                         </select>
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        <div className="flex items-center gap-3">
+                          {order.status !== 'cancelled' && (
+                            <button
+                              onClick={() => handleCancelOrder(order)}
+                              disabled={orderActionId === order.id}
+                              className="text-amber-600 hover:text-amber-800 disabled:opacity-50"
+                              title="Cancel order (keeps record)"
+                            >
+                              <X size={16} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeleteOrder(order)}
+                            disabled={orderActionId === order.id}
+                            className="text-red-600 hover:text-red-800 disabled:opacity-50"
+                            title="Delete order permanently"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

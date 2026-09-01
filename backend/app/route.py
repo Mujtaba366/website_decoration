@@ -16,7 +16,7 @@ from api.admin_dashboard import (
     delete_product as delete_admin_product
 )
 from api.admin_rentals import (
-    get_admin_bookings, update_admin_booking,
+    get_admin_bookings, update_admin_booking, delete_admin_booking,
     get_blocked_dates, create_blocked_date, delete_blocked_date
 )
 from api.admin_delivery import (
@@ -24,7 +24,7 @@ from api.admin_delivery import (
     create_delivery_option, update_delivery_option
 )
 from api.admin_settings import get_settings, update_settings
-from api.admin_orders import get_admin_orders, update_admin_order
+from api.admin_orders import get_admin_orders, update_admin_order, delete_admin_order
 
 def register_routes(app):
     # ==================== ADMIN AUTHENTICATION ====================
@@ -74,8 +74,10 @@ def register_routes(app):
     def admin_bookings_list():
         return get_admin_bookings()
 
-    @app.route('/api/admin/bookings/<booking_id>', methods=['PUT'])
+    @app.route('/api/admin/bookings/<booking_id>', methods=['PUT', 'DELETE'])
     def admin_bookings_detail(booking_id):
+        if request.method == 'DELETE':
+            return delete_admin_booking(booking_id)
         return update_admin_booking(booking_id)
 
     @app.route('/api/blocked-dates', methods=['GET'])
@@ -110,8 +112,10 @@ def register_routes(app):
     def admin_orders_list():
         return get_admin_orders()
 
-    @app.route('/api/admin/orders/<order_id>', methods=['PUT'])
+    @app.route('/api/admin/orders/<order_id>', methods=['PUT', 'DELETE'])
     def admin_orders_detail(order_id):
+        if request.method == 'DELETE':
+            return delete_admin_order(order_id)
         return update_admin_order(order_id)
 
     # ==================== SITE SETTINGS ====================

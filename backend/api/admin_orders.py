@@ -65,3 +65,24 @@ def update_admin_order(order_id):
     except Exception as e:
         print(f"Update admin order error: {e}")
         return jsonify({'error': 'Internal server error', 'details': str(e)}), 500
+
+
+def delete_admin_order(order_id):
+    """
+    DELETE /api/admin/orders/<order_id>
+    Header: Authorization: Bearer <token>
+
+    Permanently removes an order (e.g. a duplicate or test entry). For a
+    real customer order, prefer setting status to "cancelled" instead, which
+    keeps the record - this is for removing entries entirely.
+    """
+    if not _authorize():
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    try:
+        supabase = get_supabase_client()
+        supabase.table('orders').delete().eq('id', order_id).execute()
+        return jsonify({'message': 'Order deleted'}), 200
+    except Exception as e:
+        print(f"Delete admin order error: {e}")
+        return jsonify({'error': 'Internal server error', 'details': str(e)}), 500

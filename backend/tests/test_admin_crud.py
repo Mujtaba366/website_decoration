@@ -11,10 +11,12 @@ ADMIN_ENDPOINTS = [
     ('GET', '/api/admin/products'),
     ('POST', '/api/admin/products'),
     ('GET', '/api/admin/bookings'),
+    ('DELETE', '/api/admin/bookings/does-not-exist'),
     ('POST', '/api/admin/blocked-dates'),
     ('GET', '/api/admin/delivery-options'),
     ('POST', '/api/admin/delivery-options'),
     ('GET', '/api/admin/orders'),
+    ('DELETE', '/api/admin/orders/does-not-exist'),
     ('PUT', '/api/admin/settings'),
     ('GET', '/api/admin/dashboard/stats'),
 ]
@@ -116,6 +118,71 @@ class DeliveryOptionSoftDeleteTests(ApiTestCase):
         admin_listing = self.client.get('/api/admin/delivery-options', headers=headers).get_json()
         self.assertEqual(len(admin_listing), 1)
         self.assertFalse(admin_listing[0]['active'])
+
+
+class BookingCancelAndDeleteTests(ApiTestCase):
+    def _make_booking(self, event_date='2026-12-25'):
+        headers = self.auth_headers()
+        self.fake_db.store.setdefault('products', []).append(
+            {'id': 'prod-1', 'name': 'Test Arch', 'slug': 'test-arch', 'base_price': 100}
+        )
+        created = self.client.post('/api/bookings', json={
+            'product_id': 'prod-1',
+            'customer_name': 'Jane Smith',
+            'contact': 'jane@example.com',
+            'event_date': event_date,
+            'fulfillment_type': 'pickup',
+            'status': 'enquiry',
+        }).get_json()
+        return created, headers
+
+    def test_cancelling_a_booking_releases_its_blocked_date(self):
+        booking, headers = self._make_booking()
+        self.assertEqual(len(self.fake_db.store.get('blocked_dates', [])), 1)
+
+        res = self.client.put(f"/api/admin/bookings/{booking['id']}", json={'status': 'cancelled'}, headers=headers)
+        self.assertEqual(res.status_code, 200, res.get_json())
+        self.assertEqual(res.get_json()['status'], 'cancelled')
+
+        # The booking row itself is kept (soft-delete/history), but the date
+        # opens back up on the global calendar.
+        self.assertEqual(self.fake_db.store.get('blocked_dates', []), [])
+        remaining = self.client.get('/api/admin/bookings', headers=headers).get_json()['bookings']
+        self.assertEqual(len(remaining), 1)
+
+    def test_updating_status_to_something_other_than_cancelled_leaves_the_block(self):
+        booking, headers = self._make_booking()
+        res = self.client.put(f"/api/admin/bookings/{booking['id']}", json={'status': 'confirmed'}, headers=headers)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(len(self.fake_db.store.get('blocked_dates', [])), 1)
+
+    def test_deleting_a_booking_removes_it_and_releases_the_date(self):
+        booking, headers = self._make_booking()
+        res = self.client.delete(f"/api/admin/bookings/{booking['id']}", headers=headers)
+        self.assertEqual(res.status_code, 200)
+
+        self.assertEqual(self.fake_db.store.get('bookings', []), [])
+        self.assertEqual(self.fake_db.store.get('blocked_dates', []), [])
+
+
+class OrderCancelAndDeleteTests(ApiTestCase):
+    def _make_order(self):
+        headers = self.auth_headers()
+        row = {'id': 'order-1', 'customer_name': 'Jane Smith', 'status': 'pending', 'total': 50}
+        self.fake_db.store.setdefault('orders', []).append(row)
+        return row, headers
+
+    def test_setting_status_to_cancelled_via_admin_update(self):
+        order, headers = self._make_order()
+        res = self.client.put(f"/api/admin/orders/{order['id']}", json={'status': 'cancelled'}, headers=headers)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.get_json()['status'], 'cancelled')
+
+    def test_deleting_an_order_removes_it(self):
+        order, headers = self._make_order()
+        res = self.client.delete(f"/api/admin/orders/{order['id']}", headers=headers)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(self.fake_db.store.get('orders', []), [])
 
 
 class MalformedJsonOnAdminEndpointsTests(ApiTestCase):
