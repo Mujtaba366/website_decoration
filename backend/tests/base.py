@@ -34,6 +34,9 @@ PATCH_TARGETS = [
     'api.admin_orders.get_supabase_client',
     'api.admin_views.get_supabase_client',
     'api.admin_uploads.get_supabase_client',
+    'api.payment_settings.get_supabase_admin_client',
+    'api.stripe_payments.get_supabase_client',
+    'api.stripe_payments.get_supabase_admin_client',
 ]
 
 

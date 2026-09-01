@@ -119,3 +119,19 @@ export const paymentsAPI = {
     body: JSON.stringify(data),
   }),
 };
+
+// Payment config - bank account + Stripe's non-secret config. Public, but
+// deliberately narrow (see backend/api/payment_settings.py) - this is NOT
+// the same table as site settings, which is fully open.
+export const paymentConfigAPI = {
+  get: () => apiCall('/payment-config'),
+};
+
+// Stripe checkout. Returns a 503 (surfaced as a thrown Error here, same as
+// any other failed apiCall) if Stripe isn't configured on the backend.
+export const checkoutAPI = {
+  createStripeSession: (orderId: string) => apiCall<{ url: string }>('/checkout/stripe-session', {
+    method: 'POST',
+    body: JSON.stringify({ order_id: orderId }),
+  }),
+};

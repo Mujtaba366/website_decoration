@@ -8,16 +8,49 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Trash2, ShoppingBag, ArrowRight } from 'lucide-react';
-import { useState } from 'react';
-import { ordersAPI, paymentsAPI } from '@/lib/api-client';
+import { useEffect, useState } from 'react';
+import { ordersAPI, paymentsAPI, paymentConfigAPI, checkoutAPI } from '@/lib/api-client';
+import type { PaymentConfig } from '@/lib/types';
 import { toast } from 'sonner';
+
+const DEFAULT_PAYMENT_CONFIG: PaymentConfig = {
+  bank_account_number: null,
+  bank_account_name: null,
+  bank_transfer_enabled: true,
+  stripe_enabled: false,
+  stripe_publishable_key: null,
+  currency: 'NZD',
+};
 
 export default function CartPage() {
   const { items, removeItem, updateQty, total, clearCart } = useCart();
   const [name, setName] = useState('');
   const [contact, setContact] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('stripe');
+  const [paymentMethod, setPaymentMethod] = useState('afterpay');
+  const [paymentConfig, setPaymentConfig] = useState<PaymentConfig>(DEFAULT_PAYMENT_CONFIG);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const config = await paymentConfigAPI.get() as PaymentConfig;
+        setPaymentConfig(config);
+        // Default to whichever method is actually available, preferring
+        // bank transfer since it needs no third-party setup.
+        if (config.bank_transfer_enabled) setPaymentMethod('bank_transfer');
+        else if (config.stripe_enabled) setPaymentMethod('stripe');
+      } catch {
+        // Keep defaults (bank transfer assumed on, card assumed off) if the
+        // backend isn't reachable - matches how useSiteSettings() degrades.
+      }
+    })();
+  }, []);
+
+  const paymentOptions = [
+    ...(paymentConfig.stripe_enabled ? [{ id: 'stripe', label: 'Credit/Debit Card (Stripe)' }] : []),
+    ...(paymentConfig.bank_transfer_enabled ? [{ id: 'bank_transfer', label: 'Bank Transfer' }] : []),
+    { id: 'afterpay', label: 'Afterpay' },
+  ];
 
   const handleCheckout = async () => {
     if (items.length === 0) return;
@@ -57,6 +90,22 @@ export default function CartPage() {
         });
       } catch (paymentErr) {
         console.error('Order placed, but failed to record the payment sub-record:', paymentErr);
+      }
+
+      if (paymentMethod === 'stripe') {
+        try {
+          const session = await checkoutAPI.createStripeSession(order.id);
+          clearCart();
+          window.location.href = session.url;
+          return;
+        } catch (stripeErr: any) {
+          // The order already exists as 'pending' - don't lose it, just
+          // let the customer know card payment couldn't start and they can
+          // pick a different method or wait to be contacted.
+          toast.error(stripeErr?.message || 'Could not start card payment. Your order was saved - please choose another payment method or we\'ll be in touch.');
+          setSubmitting(false);
+          return;
+        }
       }
 
       toast.success('Order placed! We\'ll be in touch shortly with payment details.');
@@ -165,11 +214,7 @@ export default function CartPage() {
                 <div>
                   <Label className="mb-1.5 block">Payment method</Label>
                   <div className="space-y-2">
-                    {[
-                      { id: 'stripe', label: 'Credit/Debit Card (Stripe)' },
-                      { id: 'bank_transfer', label: 'Bank Transfer' },
-                      { id: 'afterpay', label: 'Afterpay' },
-                    ].map((opt) => (
+                    {paymentOptions.map((opt) => (
                       <label key={opt.id} className={`flex items-center gap-2 p-2.5 rounded-md border cursor-pointer text-sm transition-all ${paymentMethod === opt.id ? 'border-sage-600 bg-sage-50' : 'border-border hover:bg-muted/50'}`}>
                         <input
                           type="radio"
@@ -182,6 +227,14 @@ export default function CartPage() {
                       </label>
                     ))}
                   </div>
+                  {paymentMethod === 'bank_transfer' && paymentConfig.bank_account_number && (
+                    <div className="mt-3 p-3 rounded-md bg-sage-50 border border-sage-200 text-sm">
+                      <p className="text-slate-600">Transfer the total to:</p>
+                      <p className="font-medium text-sage-800 mt-1">{paymentConfig.bank_account_name}</p>
+                      <p className="font-mono text-sage-800">{paymentConfig.bank_account_number}</p>
+                      <p className="text-xs text-slate-500 mt-1">Please use your name as the reference. We&apos;ll confirm once received.</p>
+                    </div>
+                  )}
                 </div>
               </div>
 

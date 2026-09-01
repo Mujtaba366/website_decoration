@@ -24,15 +24,27 @@ that local, gitignored file. This section is the reference for what it needs.
 |---|---|---|
 | `SUPABASE_URL` | yes | Your Supabase project's API URL, e.g. `https://xxxxx.supabase.co`. Find it under Project Settings → API. |
 | `SUPABASE_KEY` | yes | Supabase **anon/public** key. This is what the backend authenticates every request with - see `SECURITY_DEBT.md` for why that matters (every table's RLS policy trusts this key). |
-| `SUPABASE_SERVICE_ROLE_KEY` | no (currently unused) | Present in `.env` for future use but not read by any code today - `get_supabase_client()` only reads `SUPABASE_KEY`. **This key bypasses RLS entirely - never commit it, never put it in a client-side/frontend env var, never log it.** |
+| `SUPABASE_SERVICE_ROLE_KEY` | yes, for payment settings | Read by `get_supabase_admin_client()` in `app/supabase_client.py` - the one deliberate exception to "everything uses the anon key" in this project. Used only for the `payment_settings` table (bank account number, Stripe's non-secret config), which has no anon/authenticated RLS policy at all - it's unreachable any other way. **This key bypasses RLS entirely - never commit it, never put it in a client-side/frontend env var, never log it.** Was already present in `.env` before this was wired up; nothing to add if you're seeing this after that. |
 | `FLASK_ENV` | no | `development` or `production`. Informational; not read directly by `web.py`. |
 | `FLASK_DEBUG` | no | `True`/`False`. Informational; `web.py` hardcodes `debug=True` in `app.run(...)` regardless - change that line directly for a production run rather than relying on this variable. |
 | `FLASK_APP` | no | Conventional Flask CLI variable (`web.py`). Not needed if you run `python web.py` directly. |
 | `SECRET_KEY` | no | Falls back to a hardcoded dev value if unset. Set a real random value before ever deploying anywhere reachable. |
 | `PORT` | no | Defaults to `5000`. |
-| `CORS_ORIGINS` | yes for any non-default setup | Comma-separated list of frontend origins allowed to call this API, e.g. `http://localhost:3000,https://yourdomain.com`. Defaults to `http://localhost:3000` if unset. |
-| `STRIPE_PUBLIC_KEY` / `STRIPE_SECRET_KEY` | no (unused) | Reserved for future payment integration - no code reads these yet. |
+| `CORS_ORIGINS` | yes for any non-default setup | Comma-separated list of frontend origins allowed to call this API, e.g. `http://localhost:3000,https://yourdomain.com`. Defaults to `http://localhost:3000` if unset. Also used as the fallback base for Stripe's success/cancel URLs if the admin hasn't set explicit ones in Payment Settings - see below. |
+| `STRIPE_SECRET_KEY` | no - card payments simply stay disabled without it | **Real Stripe credential. Backend env var only - never store this in the database or expose it through the admin panel, under any circumstances.** Must start with `sk_test_...` (test mode) or `sk_live_...` (live mode) - `is_stripe_configured()` in `api/stripe_payments.py` checks for that prefix specifically, so a placeholder value like the one this repo ships with (`your-stripe-secret-key`) is correctly treated as "not configured," not silently sent to Stripe's API. Get it from the Stripe Dashboard → Developers → API keys. Card payments only actually happen at checkout once BOTH this env var is set to a real key AND "Offer card payment at checkout" is turned on in Admin → Settings → Payment Settings - the admin toggle alone does nothing without this. |
+| `STRIPE_WEBHOOK_SECRET` | no - webhook processing simply stays disabled without it | Verifies that `POST /api/webhooks/stripe` requests genuinely came from Stripe (HMAC signature check, implemented by hand in `api/stripe_payments.py` - no `stripe` SDK). Without this set, the webhook endpoint acknowledges requests but does nothing - it deliberately never marks an order paid from an unverified request, since that would let anyone fake a successful payment. Get it from the Stripe Dashboard → Developers → Webhooks, after registering `https://your-backend-domain/api/webhooks/stripe` there and subscribing to the `checkout.session.completed` event. |
+| `STRIPE_PUBLIC_KEY` | no (unused - legacy name) | Not read by any code. The Stripe **publishable** key (safe to expose publicly, unlike the secret key) is set through Admin → Settings → Payment Settings instead, stored in the `payment_settings` table, and served to the storefront via the public `GET /api/payment-config` endpoint. This env var predates that and can be ignored/removed. |
 | `MAIL_SERVER` / `MAIL_PORT` / `MAIL_USE_TLS` / `MAIL_USERNAME` / `MAIL_PASSWORD` | no (unused) | Reserved for future email sending - no code reads these yet. |
+
+### Payment configuration - what lives where
+
+This project deliberately splits payment configuration across three places, by sensitivity:
+
+1. **Backend env vars only** (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`) - real secrets. Never in the database, never admin-editable, never sent to the frontend.
+2. **Admin-only database table** (`payment_settings`, edited via Admin → Settings → Payment Settings) - the bank account number and Stripe's non-secret config (publishable key, currency, enabled toggles, success/cancel URLs). This table has no RLS policy for the anon key at all - only backend code using `SUPABASE_SERVICE_ROLE_KEY` can read or write it directly. Its data still reaches customers, but only through the narrow `GET /api/payment-config` endpoint, which returns just the fields checkout actually needs (including the bank account number, since customers must see it to pay by transfer) - not a blanket dump of the row.
+3. **Public site settings** (`site_settings`, everything else in Admin → Settings) - fully open to the anon key, same as every other non-payment field on the site.
+
+If you're setting this up for a real Stripe account: paste `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` here, then paste the publishable key and turn on the toggle in the admin panel. Until both are done, the storefront correctly shows card payment as unavailable rather than erroring.
 
 ## Tests
 

@@ -78,6 +78,15 @@ export interface BlockedDate {
   booking_id: string | null;
 }
 
+export interface PaymentConfig {
+  bank_account_number: string | null;
+  bank_account_name: string | null;
+  bank_transfer_enabled: boolean;
+  stripe_enabled: boolean;
+  stripe_publishable_key: string | null;
+  currency: string;
+}
+
 export interface SiteSettings {
   site_name: string;
   tagline: string | null;

@@ -26,6 +26,8 @@ from api.admin_delivery import (
 from api.admin_settings import get_settings, update_settings
 from api.admin_orders import get_admin_orders, update_admin_order, delete_admin_order
 from api.admin_uploads import upload_product_image
+from api.payment_settings import get_payment_config, get_admin_payment_settings, update_payment_settings
+from api.stripe_payments import create_checkout_session, stripe_webhook
 
 def register_routes(app):
     # ==================== ADMIN AUTHENTICATION ====================
@@ -131,6 +133,28 @@ def register_routes(app):
     @app.route('/api/admin/settings', methods=['PUT'])
     def admin_settings_update():
         return update_settings()
+
+    # ==================== PAYMENT SETTINGS ====================
+    # payment_settings has no anon RLS policy at all (see the migration) -
+    # every function here goes through the service-role key internally.
+    @app.route('/api/payment-config', methods=['GET'])
+    def payment_config_get():
+        return get_payment_config()
+
+    @app.route('/api/admin/payment-settings', methods=['GET', 'PUT'])
+    def admin_payment_settings():
+        if request.method == 'PUT':
+            return update_payment_settings()
+        return get_admin_payment_settings()
+
+    # ==================== STRIPE ====================
+    @app.route('/api/checkout/stripe-session', methods=['POST'])
+    def stripe_checkout_session_route():
+        return create_checkout_session()
+
+    @app.route('/api/webhooks/stripe', methods=['POST'])
+    def stripe_webhook_route():
+        return stripe_webhook()
 
     # ==================== PRODUCTS ====================
     @app.route('/api/products', methods=['GET'])

@@ -70,12 +70,40 @@ const emptySettings: SiteSettingsForm = {
   shop_subheading: '',
 };
 
+interface PaymentSettingsForm {
+  bank_account_number: string;
+  bank_account_name: string;
+  bank_transfer_enabled: boolean;
+  stripe_enabled: boolean;
+  stripe_publishable_key: string;
+  stripe_success_url: string;
+  stripe_cancel_url: string;
+  currency: string;
+}
+
+const emptyPaymentSettings: PaymentSettingsForm = {
+  bank_account_number: '',
+  bank_account_name: '',
+  bank_transfer_enabled: true,
+  stripe_enabled: false,
+  stripe_publishable_key: '',
+  stripe_success_url: '',
+  stripe_cancel_url: '',
+  currency: 'NZD',
+};
+
 export default function AdminSettings() {
   const [settings, setSettings] = useState<SiteSettingsForm>(emptySettings);
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState('');
   const [settingsSuccess, setSettingsSuccess] = useState('');
+
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettingsForm>(emptyPaymentSettings);
+  const [paymentLoading, setPaymentLoading] = useState(true);
+  const [paymentSaving, setPaymentSaving] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
+  const [paymentSuccess, setPaymentSuccess] = useState('');
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -175,6 +203,72 @@ export default function AdminSettings() {
       setSettingsError('Could not reach the server. Check your connection and try again.');
     } finally {
       setSettingsSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = getAdminToken();
+        if (!token) return;
+        const res = await fetch(`${API_BASE}/admin/payment-settings`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setPaymentSettings({
+            bank_account_number: data.bank_account_number || '',
+            bank_account_name: data.bank_account_name || '',
+            bank_transfer_enabled: data.bank_transfer_enabled ?? true,
+            stripe_enabled: data.stripe_enabled ?? false,
+            stripe_publishable_key: data.stripe_publishable_key || '',
+            stripe_success_url: data.stripe_success_url || '',
+            stripe_cancel_url: data.stripe_cancel_url || '',
+            currency: data.currency || 'NZD',
+          });
+        } else {
+          setPaymentError(await describeError(res, 'Failed to load payment settings'));
+        }
+      } catch (err) {
+        console.error('Failed to load payment settings:', err);
+        setPaymentError('Could not reach the server. Check your connection and try refreshing.');
+      } finally {
+        setPaymentLoading(false);
+      }
+    })();
+  }, []);
+
+  const handleSavePaymentSettings = async () => {
+    setPaymentError('');
+    setPaymentSuccess('');
+    setPaymentSaving(true);
+
+    try {
+      const token = getAdminToken();
+      if (!token) {
+        setPaymentError('Not authenticated - try logging in again.');
+        return;
+      }
+
+      const response = await fetch(`${API_BASE}/admin/payment-settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(paymentSettings),
+      });
+
+      if (!response.ok) {
+        setPaymentError(await describeError(response, 'Failed to save payment settings'));
+        return;
+      }
+
+      setPaymentSuccess('Payment settings saved successfully!');
+    } catch (err) {
+      setPaymentError('Could not reach the server. Check your connection and try again.');
+    } finally {
+      setPaymentSaving(false);
     }
   };
 
@@ -522,6 +616,158 @@ export default function AdminSettings() {
               className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-60"
             >
               {settingsSaving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+
+        {/* Payment Settings */}
+        <div className="bg-white rounded-lg shadow">
+          <div className="px-6 py-4 border-b border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-900">Payment Settings</h2>
+            <p className="text-sm text-slate-500 mt-1">
+              Bank transfer details and card payment configuration, shown to customers at checkout.
+              Stored separately from general settings and never exposed by the public settings endpoint.
+            </p>
+          </div>
+          <div className="px-6 py-6 space-y-6">
+            {paymentError && (
+              <div className="p-3 rounded bg-red-50 border border-red-200 text-red-700 text-sm">
+                {paymentError}
+              </div>
+            )}
+            {paymentSuccess && (
+              <div className="p-3 rounded bg-green-50 border border-green-200 text-green-700 text-sm">
+                {paymentSuccess}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-800">Bank Transfer</h3>
+                <label className="flex items-center gap-2 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={paymentSettings.bank_transfer_enabled}
+                    onChange={(e) => setPaymentSettings({ ...paymentSettings, bank_transfer_enabled: e.target.checked })}
+                    disabled={paymentLoading}
+                  />
+                  Offer bank transfer at checkout
+                </label>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Account Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Bloom and Vow Ltd"
+                    value={paymentSettings.bank_account_name}
+                    onChange={(e) => setPaymentSettings({ ...paymentSettings, bank_account_name: e.target.value })}
+                    disabled={paymentLoading}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Account Number
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="12-3456-7890123-00"
+                    value={paymentSettings.bank_account_number}
+                    onChange={(e) => setPaymentSettings({ ...paymentSettings, bank_account_number: e.target.value })}
+                    disabled={paymentLoading}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-slate-500">
+                This is the account customers pay INTO for a bank transfer - not an account the
+                business pays out of. Shown directly to customers when they choose Bank Transfer at checkout.
+              </p>
+            </div>
+
+            <div className="pt-4 border-t border-slate-200 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-800">Card Payments (Stripe)</h3>
+                <label className="flex items-center gap-2 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={paymentSettings.stripe_enabled}
+                    onChange={(e) => setPaymentSettings({ ...paymentSettings, stripe_enabled: e.target.checked })}
+                    disabled={paymentLoading}
+                  />
+                  Offer card payment at checkout
+                </label>
+              </div>
+              <p className="text-xs text-slate-500">
+                Requires a Stripe account. The secret key is set by a developer directly on the
+                server (never here, for security) - see backend/README.md. Only turn this on once
+                that&apos;s done, otherwise card payment will show an error at checkout.
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Stripe Publishable Key
+                </label>
+                <input
+                  type="text"
+                  placeholder="pk_live_..."
+                  value={paymentSettings.stripe_publishable_key}
+                  onChange={(e) => setPaymentSettings({ ...paymentSettings, stripe_publishable_key: e.target.value })}
+                  disabled={paymentLoading}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Success URL
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="https://yoursite.com/cart?payment=success"
+                    value={paymentSettings.stripe_success_url}
+                    onChange={(e) => setPaymentSettings({ ...paymentSettings, stripe_success_url: e.target.value })}
+                    disabled={paymentLoading}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Cancel URL
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="https://yoursite.com/cart?payment=cancelled"
+                    value={paymentSettings.stripe_cancel_url}
+                    onChange={(e) => setPaymentSettings({ ...paymentSettings, stripe_cancel_url: e.target.value })}
+                    disabled={paymentLoading}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Currency
+                </label>
+                <input
+                  type="text"
+                  placeholder="NZD"
+                  value={paymentSettings.currency}
+                  onChange={(e) => setPaymentSettings({ ...paymentSettings, currency: e.target.value.toUpperCase() })}
+                  disabled={paymentLoading}
+                  className="w-32 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleSavePaymentSettings}
+              disabled={paymentLoading || paymentSaving}
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-60"
+            >
+              {paymentSaving ? 'Saving...' : 'Save Payment Settings'}
             </button>
           </div>
         </div>
