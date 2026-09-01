@@ -25,6 +25,7 @@ from api.admin_delivery import (
 )
 from api.admin_settings import get_settings, update_settings
 from api.admin_orders import get_admin_orders, update_admin_order, delete_admin_order
+from api.admin_uploads import upload_product_image
 
 def register_routes(app):
     # ==================== ADMIN AUTHENTICATION ====================
@@ -68,6 +69,10 @@ def register_routes(app):
         elif request.method == 'DELETE':
             return delete_admin_product(product_id)
         # GET is handled by the list endpoint
+
+    @app.route('/api/admin/products/upload-image', methods=['POST'])
+    def admin_products_upload_image():
+        return upload_product_image()
 
     # ==================== ADMIN RENTALS (bookings + global calendar) ====================
     @app.route('/api/admin/bookings', methods=['GET'])

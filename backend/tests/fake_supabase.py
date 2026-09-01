@@ -119,6 +119,11 @@ class FakeSupabaseClient:
     def __init__(self, seed=None):
         # seed: optional {table_name: [row_dict, ...]}
         self.store = {k: [dict(r) for r in v] for k, v in (seed or {}).items()}
+        self.uploaded_files = []  # [(bucket, path, content_type, len(data)), ...]
 
     def table(self, name):
         return FakeTable(self.store, name)
+
+    def upload_file(self, bucket, path, data, content_type):
+        self.uploaded_files.append((bucket, path, content_type, len(data)))
+        return f'https://fake.supabase.co/storage/v1/object/public/{bucket}/{path}'

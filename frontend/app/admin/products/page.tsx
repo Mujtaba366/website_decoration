@@ -55,6 +55,7 @@ export default function AdminProducts() {
   const [success, setSuccess] = useState('');
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [uploadingFor, setUploadingFor] = useState<'new' | 'edit' | null>(null);
 
   useEffect(() => {
     fetchProducts();
@@ -107,6 +108,46 @@ export default function AdminProducts() {
     personalization_label: form.personalization_label || null,
     active: form.active,
   });
+
+  const uploadImage = async (file: File): Promise<string | null> => {
+    const headers = authHeaders();
+    if (!headers) return null;
+
+    const body = new FormData();
+    body.append('image', file);
+
+    try {
+      const response = await fetch(`${API_BASE}/admin/products/upload-image`, {
+        method: 'POST',
+        headers, // no Content-Type - the browser sets the multipart boundary itself
+        body,
+      });
+      if (response.ok) {
+        return (await response.json()).url as string;
+      }
+      setError(await describeError(response, 'Failed to upload image'));
+      return null;
+    } catch (err) {
+      setError('Could not reach the server while uploading the image.');
+      return null;
+    }
+  };
+
+  const handleNewProductImage = async (file: File) => {
+    setError('');
+    setUploadingFor('new');
+    const url = await uploadImage(file);
+    setUploadingFor(null);
+    if (url) setNewProduct((prev) => ({ ...prev, image: url }));
+  };
+
+  const handleEditImage = async (file: File) => {
+    setError('');
+    setUploadingFor('edit');
+    const url = await uploadImage(file);
+    setUploadingFor(null);
+    if (url) setEditData((prev) => (prev ? { ...prev, image: url } : prev));
+  };
 
   const handleEdit = (product: Product) => {
     setEditingId(product.id);
@@ -275,13 +316,26 @@ export default function AdminProducts() {
                 onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
                 className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <input
-                type="text"
-                placeholder="Image URL"
-                value={newProduct.image}
-                onChange={(e) => setNewProduct({ ...newProduct, image: e.target.value })}
-                className="px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <div className="flex items-center gap-3">
+                {newProduct.image && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={newProduct.image} alt="" className="w-12 h-12 object-cover rounded border border-slate-200" />
+                )}
+                <label className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 cursor-pointer hover:bg-slate-50 text-center">
+                  {uploadingFor === 'new' ? 'Uploading...' : newProduct.image ? 'Change image' : 'Upload image'}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="hidden"
+                    disabled={uploadingFor === 'new'}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleNewProductImage(file);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+              </div>
               <input
                 type="text"
                 placeholder="Personalization label (shop items only, optional)"
@@ -305,7 +359,7 @@ export default function AdminProducts() {
               </label>
               <button
                 type="submit"
-                disabled={saving}
+                disabled={saving || uploadingFor === 'new'}
                 className="col-span-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition disabled:opacity-60"
               >
                 {saving ? 'Adding...' : 'Add Product'}
@@ -340,6 +394,7 @@ export default function AdminProducts() {
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Image</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Name</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Type</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-slate-900">Price</th>
@@ -353,6 +408,30 @@ export default function AdminProducts() {
                     <tr key={product.id} className="hover:bg-slate-50">
                       {editingId === product.id ? (
                         <>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col items-start gap-1">
+                              {editData?.image ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={editData.image} alt="" className="w-12 h-12 object-cover rounded border border-slate-200" />
+                              ) : (
+                                <div className="w-12 h-12 rounded border border-dashed border-slate-300 flex items-center justify-center text-[10px] text-slate-400">None</div>
+                              )}
+                              <label className="text-xs text-blue-600 hover:text-blue-800 cursor-pointer">
+                                {uploadingFor === 'edit' ? 'Uploading...' : 'Change'}
+                                <input
+                                  type="file"
+                                  accept="image/jpeg,image/png,image/webp,image/gif"
+                                  className="hidden"
+                                  disabled={uploadingFor === 'edit'}
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleEditImage(file);
+                                    e.target.value = '';
+                                  }}
+                                />
+                              </label>
+                            </div>
+                          </td>
                           <td className="px-6 py-4">
                             <input
                               type="text"
@@ -399,7 +478,7 @@ export default function AdminProducts() {
                             <div className="flex gap-2">
                               <button
                                 onClick={handleSaveEdit}
-                                disabled={saving}
+                                disabled={saving || uploadingFor === 'edit'}
                                 className="text-green-600 hover:text-green-800 disabled:opacity-50"
                                 title="Save"
                               >
@@ -418,6 +497,14 @@ export default function AdminProducts() {
                         </>
                       ) : (
                         <>
+                          <td className="px-6 py-4">
+                            {product.images?.[0] ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={product.images[0]} alt="" className="w-12 h-12 object-cover rounded border border-slate-200" />
+                            ) : (
+                              <div className="w-12 h-12 rounded border border-dashed border-slate-300 flex items-center justify-center text-[10px] text-slate-400">None</div>
+                            )}
+                          </td>
                           <td className="px-6 py-4 text-sm text-slate-900">{product.name}</td>
                           <td className="px-6 py-4 text-sm text-slate-600 capitalize">{product.type}</td>
                           <td className="px-6 py-4 text-sm text-slate-900">${Number(product.base_price).toFixed(2)}</td>

@@ -49,6 +49,24 @@ class SupabaseClient:
     def table(self, name: str):
         return SupabaseTable(self.url, self.headers, name)
 
+    def upload_file(self, bucket: str, path: str, data: bytes, content_type: str) -> str:
+        """Uploads bytes to a Supabase Storage bucket via the raw REST API
+        (no supabase-py/storage3 dependency, matching how every table
+        operation in this client is already hand-rolled with `requests`).
+        Returns the public URL - the bucket must be public for this to be
+        useful, which is true for 'product-images'."""
+        url = f'{self.url}/storage/v1/object/{bucket}/{path}'
+        headers = {
+            'Authorization': self.headers['Authorization'],
+            'apikey': self.headers['apikey'],
+            'Content-Type': content_type,
+            'x-upsert': 'true',
+        }
+        response = _request('POST', url, headers, data=data)
+        if response.status_code not in (200, 201):
+            raise SupabaseError(response.status_code, response.text)
+        return f'{self.url}/storage/v1/object/public/{bucket}/{path}'
+
 class SupabaseTable:
     def __init__(self, url: str, headers: dict, table_name: str):
         self.url = url
@@ -174,6 +192,7 @@ class SupabaseDelete:
             raise SupabaseError(response.status_code, response.text)
 
 _client = None
+_admin_client = None
 
 def get_supabase_client() -> SupabaseClient:
     global _client
@@ -184,3 +203,23 @@ def get_supabase_client() -> SupabaseClient:
             raise Exception('SUPABASE_URL and SUPABASE_KEY must be set in .env')
         _client = SupabaseClient(url, key)
     return _client
+
+
+def get_supabase_admin_client() -> SupabaseClient:
+    """Returns a client authenticated with the service-role key, which
+    bypasses Row Level Security entirely. Every other table in this project
+    uses the anon key with fully-open RLS - this is the one deliberate
+    exception, reserved for the payment_settings table (bank account
+    number, Stripe config), which has RLS enabled with no anon/authenticated
+    policies at all. That table is unreachable with the anon key by design;
+    only code that has gone through this function can read or write it.
+    Do not use this for anything else - reach for get_supabase_client()
+    for every other table."""
+    global _admin_client
+    if _admin_client is None:
+        url = os.getenv('SUPABASE_URL')
+        key = os.getenv('SUPABASE_SERVICE_ROLE_KEY')
+        if not url or not key:
+            raise Exception('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in .env')
+        _admin_client = SupabaseClient(url, key)
+    return _admin_client

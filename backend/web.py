@@ -8,6 +8,10 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": os.getenv('CORS_ORIGINS', 'http://localhost:3000').split(',')}})
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
+# Slightly above the 5MB per-image limit enforced in admin_uploads.py, to
+# leave room for multipart overhead - this is the outer guard that rejects
+# an oversized request before it's fully read into memory at all.
+app.config['MAX_CONTENT_LENGTH'] = 6 * 1024 * 1024
 
 from app.route import register_routes
 
@@ -33,6 +37,10 @@ def unsupported_media_type(error):
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({'error': 'Not found'}), 404
+
+@app.errorhandler(413)
+def payload_too_large(error):
+    return jsonify({'error': 'Upload is too large. Maximum size is 5MB.'}), 413
 
 @app.errorhandler(500)
 def internal_error(error):

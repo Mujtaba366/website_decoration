@@ -33,6 +33,7 @@ PATCH_TARGETS = [
     'api.admin_settings.get_supabase_client',
     'api.admin_orders.get_supabase_client',
     'api.admin_views.get_supabase_client',
+    'api.admin_uploads.get_supabase_client',
 ]
 
 
