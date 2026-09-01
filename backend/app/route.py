@@ -130,12 +130,12 @@ def register_routes(app):
 
     @app.route('/api/products', methods=['POST'])
     def products_create():
-        return create_product(request.get_json())
+        return create_product(request.get_json(silent=True))
 
     @app.route('/api/products/<product_id>', methods=['GET', 'PUT', 'DELETE'])
     def products_detail(product_id):
         if request.method == 'PUT':
-            return update_product(product_id, request.get_json())
+            return update_product(product_id, request.get_json(silent=True))
         elif request.method == 'DELETE':
             return delete_product(product_id)
         return get_products(product_id)
@@ -144,13 +144,13 @@ def register_routes(app):
     @app.route('/api/bookings', methods=['GET', 'POST'])
     def bookings_list():
         if request.method == 'POST':
-            return create_booking(request.get_json())
+            return create_booking(request.get_json(silent=True))
         return get_bookings()
 
     @app.route('/api/bookings/<booking_id>', methods=['GET', 'PUT', 'DELETE'])
     def bookings_detail(booking_id):
         if request.method == 'PUT':
-            return update_booking(booking_id, request.get_json())
+            return update_booking(booking_id, request.get_json(silent=True))
         elif request.method == 'DELETE':
             return delete_booking(booking_id)
         return get_bookings(booking_id)
@@ -159,13 +159,13 @@ def register_routes(app):
     @app.route('/api/availability', methods=['GET', 'POST'])
     def availability_list():
         if request.method == 'POST':
-            return create_availability(request.get_json())
+            return create_availability(request.get_json(silent=True))
         return get_availability()
 
     @app.route('/api/availability/<availability_id>', methods=['GET', 'PUT', 'DELETE'])
     def availability_detail(availability_id):
         if request.method == 'PUT':
-            return update_availability(availability_id, request.get_json())
+            return update_availability(availability_id, request.get_json(silent=True))
         elif request.method == 'DELETE':
             return delete_availability(availability_id)
         return get_availability(availability_id)
@@ -174,13 +174,13 @@ def register_routes(app):
     @app.route('/api/orders', methods=['GET', 'POST'])
     def orders_list():
         if request.method == 'POST':
-            return create_order(request.get_json())
+            return create_order(request.get_json(silent=True))
         return get_orders()
 
     @app.route('/api/orders/<order_id>', methods=['GET', 'PUT', 'DELETE'])
     def orders_detail(order_id):
         if request.method == 'PUT':
-            return update_order(order_id, request.get_json())
+            return update_order(order_id, request.get_json(silent=True))
         elif request.method == 'DELETE':
             return delete_order(order_id)
         return get_orders(order_id)
@@ -189,7 +189,7 @@ def register_routes(app):
     @app.route('/api/messages', methods=['GET', 'POST'])
     def messages_list():
         if request.method == 'POST':
-            return create_message(request.get_json())
+            return create_message(request.get_json(silent=True))
         return get_messages()
 
     @app.route('/api/messages/<message_id>', methods=['GET', 'DELETE'])
@@ -202,13 +202,13 @@ def register_routes(app):
     @app.route('/api/payments', methods=['GET', 'POST'])
     def payments_list():
         if request.method == 'POST':
-            return create_payment(request.get_json())
+            return create_payment(request.get_json(silent=True))
         return get_payments()
 
     @app.route('/api/payments/<payment_id>', methods=['GET', 'PUT', 'DELETE'])
     def payments_detail(payment_id):
         if request.method == 'PUT':
-            return update_payment(payment_id, request.get_json())
+            return update_payment(payment_id, request.get_json(silent=True))
         elif request.method == 'DELETE':
             return delete_payment(payment_id)
         return get_payments(payment_id)

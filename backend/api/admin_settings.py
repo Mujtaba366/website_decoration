@@ -45,7 +45,7 @@ def update_settings():
         return jsonify({'error': 'Unauthorized'}), 401
 
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
         if not data:
             return jsonify({'error': 'Invalid JSON'}), 400
 

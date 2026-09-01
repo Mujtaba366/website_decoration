@@ -118,6 +118,45 @@ class DeliveryOptionSoftDeleteTests(ApiTestCase):
         self.assertFalse(admin_listing[0]['active'])
 
 
+class MalformedJsonOnAdminEndpointsTests(ApiTestCase):
+    """Regression tests for a real bug found in this session's correctness
+    sweep: every admin_*.py endpoint wraps its whole body (including the
+    `request.get_json()` call) in a single broad `except Exception`. Flask's
+    own request.get_json() raises a werkzeug BadRequest/UnsupportedMediaType
+    on malformed JSON or a missing Content-Type header - those ARE Exception
+    subclasses, so they were being caught by the broad except and turned
+    into a generic 500 "Internal server error", silently downgrading what
+    should have been a clean 400/415 into a worse, less accurate response.
+    Fixed by using request.get_json(silent=True) everywhere, so a bad body
+    becomes `None` and falls through to each endpoint's own
+    "if not data: return 400" check instead of raising at all."""
+
+    def test_malformed_json_on_admin_products_returns_400_not_500(self):
+        headers = self.auth_headers()
+        headers['Content-Type'] = 'application/json'
+        res = self.client.post('/api/admin/products', data='not valid json', headers=headers)
+        self.assertEqual(res.status_code, 400)
+        self.assertNotEqual(res.status_code, 500)
+
+    def test_missing_content_type_on_admin_products_returns_400_not_500(self):
+        headers = self.auth_headers()
+        res = self.client.post('/api/admin/products', data='x', headers=headers)
+        self.assertIn(res.status_code, (400, 415))
+        self.assertNotEqual(res.status_code, 500)
+
+    def test_malformed_json_on_admin_settings_returns_400_not_500(self):
+        headers = self.auth_headers()
+        headers['Content-Type'] = 'application/json'
+        res = self.client.put('/api/admin/settings', data='not valid json', headers=headers)
+        self.assertEqual(res.status_code, 400)
+
+    def test_malformed_json_on_change_password_returns_400_not_500(self):
+        headers = self.auth_headers()
+        headers['Content-Type'] = 'application/json'
+        res = self.client.post('/api/admin/change-password/', data='not valid json', headers=headers)
+        self.assertEqual(res.status_code, 400)
+
+
 if __name__ == '__main__':
     import unittest
     unittest.main()

@@ -64,7 +64,7 @@ def create_delivery_option():
         return jsonify({'error': 'Unauthorized'}), 401
 
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
         if not data or not (data.get('label') or '').strip():
             return jsonify({'error': 'label is required'}), 400
 
@@ -100,7 +100,7 @@ def update_delivery_option(option_id):
         return jsonify({'error': 'Unauthorized'}), 401
 
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
         if not data:
             return jsonify({'error': 'Invalid JSON'}), 400
 

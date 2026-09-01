@@ -56,7 +56,7 @@ def update_admin_booking(booking_id):
         return jsonify({'error': 'Unauthorized'}), 401
 
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
         if not data:
             return jsonify({'error': 'Invalid JSON'}), 400
 
@@ -105,7 +105,7 @@ def create_blocked_date():
         return jsonify({'error': 'Unauthorized'}), 401
 
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
         if not data or not data.get('date'):
             return jsonify({'error': 'date is required'}), 400
 

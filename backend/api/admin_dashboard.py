@@ -144,7 +144,7 @@ def create_product():
         if not is_valid:
             return jsonify({'error': 'Unauthorized'}), 401
 
-        data = request.get_json()
+        data = request.get_json(silent=True)
         if not data:
             return jsonify({'error': 'Invalid JSON'}), 400
 
@@ -200,7 +200,7 @@ def update_product(product_id):
         if not is_valid:
             return jsonify({'error': 'Unauthorized'}), 401
 
-        data = request.get_json()
+        data = request.get_json(silent=True)
         if not data:
             return jsonify({'error': 'Invalid JSON'}), 400
 

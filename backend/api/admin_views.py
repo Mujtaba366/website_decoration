@@ -38,7 +38,7 @@ def admin_login():
     Checks credentials from Supabase database first, falls back to in-memory ADMIN_USERS
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
         print(f"DEBUG: Login request received: {data}")
 
         if not data:
@@ -169,7 +169,7 @@ def admin_change_password():
         session = get_session(token)
         if not session or not verify_session(token):
             return jsonify({'error': 'Unauthorized'}), 401
-        data = request.get_json()
+        data = request.get_json(silent=True)
 
         if not data:
             return jsonify({'error': 'Invalid JSON'}), 400
