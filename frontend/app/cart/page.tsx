@@ -43,12 +43,21 @@ export default function CartPage() {
         status: 'pending',
       });
 
-      await paymentsAPI.create({
-        order_id: order.id,
-        method: paymentMethod,
-        amount: total,
-        status: 'pending',
-      });
+      // The order itself already stores payment_method and total - this
+      // payments row is a supplementary record, not the source of truth.
+      // Treat it as best-effort: if it fails, the order still succeeded,
+      // so don't block the customer or risk them retrying and placing a
+      // second, duplicate order for the same cart.
+      try {
+        await paymentsAPI.create({
+          order_id: order.id,
+          method: paymentMethod,
+          amount: total,
+          status: 'pending',
+        });
+      } catch (paymentErr) {
+        console.error('Order placed, but failed to record the payment sub-record:', paymentErr);
+      }
 
       toast.success('Order placed! We\'ll be in touch shortly with payment details.');
       clearCart();
