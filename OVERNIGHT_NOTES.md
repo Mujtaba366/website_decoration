@@ -149,6 +149,26 @@ in the schema/types but has no admin UI field and nothing renders it either - le
 alone since, unlike `service_area_note`, there's no existing UI promising it does
 something; it just doesn't exist as a feature yet, which isn't a bug).
 
+### [R3-4] How It Works page hero → editable from site_settings
+
+After the side request (see the top of this file - deleting `backend/.env.example`),
+resumed with one more increment of the same hero-content pattern from round two:
+`how_it_works_heading`/`how_it_works_subheading` added to `site_settings`
+(additive migration, defaults equal to the exact previously-hardcoded copy), a new
+"How It Works Page" card in `/admin/settings`. This was the last of the three major
+page heroes (Home, About, How It Works) left hardcoded - all three now go through
+the same DB-driven pattern. Left the 4-step process list and 3 info cards on the
+same page hardcoded, consistent with round two's "one substantial block per page"
+call on the About page.
+
+Verified: page renders identically before any edit; edited the heading directly in
+the database and confirmed the live page reflected it immediately; separately
+confirmed the admin settings form correctly loads that same value back out of the
+real `GET /api/settings` response into its input field (round-tripping through the
+actual API, not just checking the database) - a slightly more thorough check than
+the previous two hero migrations got, and it passed. Reverted to original copy
+afterward.
+
 ### Verification this round
 
 Backend suite is now 52 tests (was 37 at the start of round two, 48 after the first
@@ -163,7 +183,7 @@ DB row counts checked against baseline before and after every live verification
 pass throughout this round - unchanged (products 8, bookings 4, orders 4, messages
 3, payments 4, blocked_dates 0, delivery_options 2, site_settings 1) - every piece
 of test data created during verification (test products, test bookings, test
-orders, a test settings edit) was deleted or reverted immediately after confirming
+orders, test settings edits) was deleted or reverted immediately after confirming
 it worked.
 
 ### Round three summary
@@ -185,10 +205,10 @@ test the actual running server, not just the diff.
    it affects literally every admin write endpoint the same way.
 4. **Admin depth**: fixed the public-header/footer-leaking-into-admin-pages issue,
    verified genuinely mobile-usable at a real viewport for the first time.
-5. **DB content**: fixed `service_area_note`'s dead wiring - smaller in scope than
-   round two's hero/about work, but a real bug fix rather than new customization
-   surface, which felt like the right thing to prioritize given what the sweep
-   turned up.
+5. **DB content**: fixed `service_area_note`'s dead wiring (a real bug fix, not new
+   surface - prioritized over new customization given what the sweep turned up),
+   then added the How It Works page hero to the same pattern as round two's
+   Home/About heroes - all three major page heroes are now DB-driven.
 
 ### Needs permission / blocked (unchanged from round two)
 
@@ -205,6 +225,11 @@ reaching for. Nothing new got blocked this round.
 4. `fix: admin pages no longer show the public storefront header/footer`
 5. `fix: malformed JSON on any endpoint returned 500 instead of 400/415`
 6. `fix: service_area_note setting was editable but never displayed anywhere`
+7. `docs: round three final summary`
+8. `docs: replace backend/.env.example with backend/README.md env var reference`
+   (side request, see the top of this file)
+9. `docs: note the backend/.env.example deletion side request`
+10. `feat: make How It Works page hero editable from admin settings`
 
 All local only - no remote configured, nothing pushed.
 
