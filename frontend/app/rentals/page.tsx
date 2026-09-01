@@ -9,10 +9,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useSiteSettings } from '@/components/site-settings-context';
 
 const rentalCategories = ['Arches', 'Backdrops', 'Benches', 'Florals', 'Table Settings', 'Signs'];
 
 export default function RentalsPage() {
+  const { service_area_note } = useSiteSettings();
   const { data: allProducts = [], loading } = useApi(() => productsAPI.list(), []);
   const [selectedCats, setSelectedCats] = useState<string[]>([]);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
@@ -44,8 +46,8 @@ export default function RentalsPage() {
           Rent the Perfect Setting
         </h1>
         <p className="mt-4 text-muted-foreground max-w-xl mx-auto">
-          Choose from our collection of floral arches, backdrops, benches, and more.
-          We deliver and set up across Auckland, or you can pick it up yourself.
+          Choose from our collection of floral arches, backdrops, benches, and more.{' '}
+          {service_area_note}
         </p>
       </div>
 
