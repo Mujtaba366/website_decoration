@@ -1,11 +1,17 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Flower2, Mail, Phone, MapPin, Instagram } from 'lucide-react';
 import { useSiteSettings } from '@/components/site-settings-context';
 
 export function SiteFooter() {
+  const pathname = usePathname();
   const { site_name, tagline, support_email, phone, location, instagram_handle } = useSiteSettings();
+
+  // Same reasoning as SiteHeader: admin pages shouldn't show the public
+  // storefront footer (marketing links, social handles) below the admin UI.
+  if (pathname?.startsWith('/admin')) return null;
 
   return (
     <footer className="border-t border-border bg-sage-50/50 mt-20">

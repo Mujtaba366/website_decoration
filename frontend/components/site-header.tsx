@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { Menu, X, ShoppingBag, Flower2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/components/cart-context';
@@ -17,6 +18,7 @@ const navLinks = [
 ];
 
 export function SiteHeader() {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { count } = useCart();
@@ -27,6 +29,13 @@ export function SiteHeader() {
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  // Admin pages have their own header (AdminTopNav) - showing the public
+  // storefront header above it too (shopping cart, marketing nav) wasted a
+  // lot of vertical space on mobile and looked like two unrelated sites
+  // stacked on top of each other. All hooks above still run unconditionally
+  // (Rules of Hooks) - only the render output is skipped.
+  if (pathname?.startsWith('/admin')) return null;
 
   return (
     <header
