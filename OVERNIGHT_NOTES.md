@@ -8,11 +8,18 @@ written as one document, so here's the map:
 
 - **This "Start here" section** - what's below, and the current prioritized
   recommendations (read this first).
+- **"Round seven"** - deploy-prep round: full git-history secret scan before
+  the first-ever push, found the GitHub repo is public (paused for a decision
+  rather than pushing), and reconciled `render.yaml` with the service-role
+  key migration. Surfacing Stripe payment/receipt data in the admin panel
+  (the second half of round six's ask) is still outstanding - paused when
+  this deploy request came in, not forgotten.
 - **"Round six"** - the RLS lockdown round: switched the backend to the
   service-role key and locked Row Level Security down on every table
   (`SECURITY_DEBT.md` items 1 and 2, explicitly approved this round,
-  superseding the earlier "don't touch RLS" instruction), plus surfacing
-  Stripe payment/receipt data in the admin panel.
+  superseding the earlier "don't touch RLS" instruction). Also found and
+  fixed a second, separate auth gap (legacy public bookings/orders/messages/
+  payments endpoints with no auth check at all).
 - **"Round five"** - the payments round: fixed the unauthenticated debug
   endpoint (approved to act on `SECURITY_DEBT.md` item 4 for the first time),
   added cancel/delete for bookings and orders, product image upload to
@@ -37,7 +44,7 @@ written as one document, so here's the map:
   DB-editable for the first time.
 
 **Current state**: tree builds clean (`npm run build` in `frontend/`), both test
-suites pass (99 backend tests via `unittest`, 16 frontend tests via
+suites pass (109 backend tests via `unittest`, 16 frontend tests via
 `node --test`, zero new dependencies for either), and the Supabase database is
 at the same row counts it started this engagement at, plus one new table
 (`payment_settings`, singleton row) and 13 new nullable/defaulted columns on
@@ -49,7 +56,9 @@ six, the backend authenticates to Supabase with the service-role key and every
 table's RLS is locked down (zero anon access on sensitive tables, anon-SELECT-
 only on public ones) - verified directly against the live project, not just
 assumed. Nothing is mid-edit. Everything is committed locally; nothing has
-ever been pushed anywhere.
+been pushed anywhere yet - the no-push rule was lifted for this repo
+specifically in round seven, but the push itself is paused pending Mujtaba's
+decision on the GitHub repo's public visibility (see "Round seven" below).
 
 ## Recommended next steps, prioritized
 
@@ -238,15 +247,91 @@ avoid scope creep on an already large, high-risk task - Supabase's own
 `list_migrations` history remains the authoritative record for those if ever
 needed.
 
-Backend test suite unaffected by any of this (all 99 tests mock Supabase
-entirely, so they never exercised the real RLS policies either before or
+Backend test suite unaffected by any of this (the suite mocks Supabase
+entirely, so it never exercised the real RLS policies either before or
 after - a real gap in what the suite can catch, worth knowing about rather
 than treating "tests pass" as proof RLS was ever configured correctly. Every
 RLS claim in this round was checked directly against the live database).
 
+**A second, separate finding surfaced while planning Part 2 below**, and was
+fixed on the spot with Mujtaba's approval: `/api/bookings`, `/api/orders`,
+`/api/messages`, and `/api/payments` had no auth check at all on
+GET/PUT/DELETE - only POST (customer-facing create) was ever meant to be
+public. This is a Flask-layer gap, independent of RLS (RLS only closes the
+"bypass Flask, hit Supabase directly" path - this was wide open even going
+through Flask exactly as intended). Confirmed via grep the frontend never
+calls anything but POST on these four routes, so gating the rest had zero
+functional risk. Now documented as `SECURITY_DEBT.md` item 8 (fixed). Test
+suite grew to 109 tests covering this plus everything else in the round.
+
 ### Part 2: Stripe payment/receipt data in admin
 
-[continued below once this part is done]
+**Not started.** Paused immediately after finding and fixing the endpoint-auth
+gap above, when Mujtaba's deploy request (see "Round seven") came in. Still
+outstanding: order/booking rows showing payment status, amount paid, a
+receipt link, and a refund action, sourced from Stripe's Charge/PaymentIntent
+data, degrading cleanly when Stripe is unconfigured (still no real
+credentials). Pick this up next.
+
+---
+
+## Round seven (deploy prep)
+
+Mujtaba asked to push this repo to GitHub (`Mujtaba366/website_decoration`,
+already connected to Render for auto-deploy) and get it deployment-ready, but
+with explicit, non-negotiable gates before any push: a full git-history
+secret scan (not just the working tree), a check on whether the GitHub repo
+is public or private (stop and ask if public), and confirmation `.gitignore`
+still covers `backend/.env`.
+
+**Git history scan - clean.** Checked all 69 commits, not just current
+files: no `.env` file was ever committed at any point; `backend/.env.example`
+and `render.yaml` (the two files that briefly held real credentials before
+the very first commit, per the side-request entry earlier in this log)
+contain only placeholder values at every commit that ever touched them;
+a full-history grep for the Supabase JWT header pattern, Stripe secret-key
+patterns (`sk_test_`/`sk_live_`/`whsec_`), and every historical
+`SUPABASE_KEY`/`SUPABASE_SERVICE_ROLE_KEY`/`SUPABASE_URL` assignment turned up
+nothing but placeholders, `${VAR}` substitutions, and `os.getenv(...)` reads -
+never a live value. `backend/.env` is properly gitignored and was never
+tracked. One untracked, gitignored local file (`backend/pass(ignore dont
+edit)`) exists on disk but has never been committed - left untouched, not
+this engagement's business.
+
+**GitHub repo visibility - PUBLIC. Push paused, not completed.** Per the
+explicit instruction to stop and ask rather than push a public repo
+unprompted, no `git remote add` or `git push` has been run. Everything below
+is prepared and ready to go the moment Mujtaba decides how he wants to
+proceed (make it private first, or push knowingly as public).
+
+**`render.yaml` reconciled** with the service-role-key migration from round
+six - it only referenced the anon key, which is no longer read by any backend
+code at all; `SUPABASE_SERVICE_ROLE_KEY` was missing entirely, which would
+have made every database-touching request fail on a real deploy.  Added it,
+plus `SECRET_KEY` and the two optional Stripe vars, all `sync: false` (set in
+Render's dashboard, never committed). Also found and fixed a subtler risk:
+`CORS_ORIGINS` and `NEXT_PUBLIC_API_URL` had hardcoded, mismatched guessed
+`onrender.com` URLs instead of `sync: false` - since a blueprint sync applies
+non-`sync:false` values on deploy, pushing this file as it stood risked
+silently overwriting whatever correct values might already be set in Render's
+dashboard with these wrong guesses. Changed both to `sync: false` so they
+must be set explicitly and can't be clobbered this way.
+
+**First-deploy risks flagged for Mujtaba** (full detail given directly to
+him, not duplicating it all here): `NEXT_PUBLIC_API_URL` is a Next.js
+build-time-baked variable, not a runtime one - if it's wrong when
+`npm run build` runs on Render, the entire deployed site (public and admin)
+silently falls back to calling `localhost:5000` and nothing works, with no
+obvious error. `frontend/app/layout.tsx`'s `metadataBase` is still hardcoded
+to a guessed, likely-wrong `onrender.com` URL (SEO/social-preview metadata
+only, not functionality) - needs a manual update once the real deployed URL
+or a custom domain is known, left alone here rather than guessing again.
+Confirmed unaffected by anything in this round: `gunicorn` is already in
+`requirements.txt`; the `product-images` Storage bucket is public and its
+uploads go through the service-role key, so it works regardless of anon RLS;
+and the `admin_users` row already exists in the same Supabase project this
+app has used all engagement, which is what would go live - no separate
+prod database to seed.
 
 ---
 
