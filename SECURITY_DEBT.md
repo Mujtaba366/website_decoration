@@ -9,56 +9,77 @@ exposure window so far is "sits on one laptop," not "sits on the internet."
 
 Ordered roughly by how bad it'd be if this went live as-is today.
 
-## 1. Every Supabase table is writable by anyone with the anon key
+## 1. Every Supabase table is writable by anyone with the anon key — FIXED
 
-Every table's Row Level Security policy is `TO anon, authenticated USING (true)` /
-`WITH CHECK (true)` for SELECT, INSERT, UPDATE, and (mostly) DELETE. That includes
-`products`, `orders`, `bookings`, `payments`, `messages`, `blocked_dates`,
-`delivery_options`, `site_settings`, and `admin_users`.
+**Status: fixed** (RLS lockdown round - see `OVERNIGHT_NOTES.md`). Explicitly
+approved and requested by Mujtaba, superseding the earlier "don't act on this"
+instruction specifically for RLS.
 
-**What this means concretely:** the Flask backend's admin-token auth
-(`verify_admin_token`, the `Authorization: Bearer <token>` check on `/api/admin/*`
-routes) is the *only* thing standing between a visitor and the database - but it's
-only enforced by the Flask app. Anyone who has the Supabase anon key can skip Flask
-entirely and hit `https://<project>.supabase.co/rest/v1/<table>` directly with that
-key, and Postgres will let them read, insert, update, or delete anything in any
-table. No admin token needed at that layer at all.
+Every table's Row Level Security policy used to be `TO anon, authenticated
+USING (true)` / `WITH CHECK (true)` for SELECT, INSERT, UPDATE, and (mostly)
+DELETE - including `products`, `orders`, `bookings`, `payments`, `messages`,
+`blocked_dates`, `delivery_options`, `site_settings`, `rental_availability`, and
+`admin_users`. This existed because the Flask backend itself authenticated to
+Supabase with the anon key, so RLS had to stay wide open just for the app to
+function - the Flask admin-token check (`verify_admin_token`) was the *only*
+real gate, and it was only enforced by the Flask app, not by the database.
 
-**Why this exists:** this looks like a deliberate simplification for a
-fast-moving 2-person business site (the original schema migration's own comment says
-"this is a public storefront with no sign-in... intentionally public/shared"), which
-is fine for the genuinely public tables (`products` SELECT, customers creating their
-own `bookings`/`orders`/`messages`). It's not fine for `admin_users`, `payments`
-status, or letting anyone overwrite `site_settings` or delete any booking/order they
-want.
+**The fix, in two parts:**
+1. The backend now authenticates to Supabase with the **service-role key**
+   instead of the anon key (`get_supabase_client()` in
+   `backend/app/supabase_client.py`). This bypasses RLS entirely, which is
+   correct here because Flask already does its own authorization
+   (`verify_admin_token` on every admin route) independent of RLS - RLS's job
+   shifted from "gate the backend's own operations" to "stop someone from
+   bypassing Flask and hitting Supabase's REST API directly with a key they
+   found."
+2. RLS on every table was then locked down, table by table, each verified live
+   and committed separately (see the `frontend/supabase/migrations/2026090102*`
+   files): `admin_users`, `bookings`, `orders`, `messages`, `payments`,
+   `rental_availability` (confirmed dead), and `payment_settings` (already
+   correct from an earlier round) now have **zero** anon/authenticated policies
+   at all. `products`, `blocked_dates`, `delivery_options`, and `site_settings`
+   are anon-**SELECT-only** - genuinely public data stays readable, nothing can
+   be written by anyone without going through Flask's own auth.
 
-**Not fixed because:** tightening RLS is exactly the kind of "act on the auth model"
-change that's explicitly out of scope for now (both the general "don't act on
-security debt" instruction and the specific "don't add RLS beyond the existing
-project pattern" one). Also because the backend authenticates to Supabase with the
-**anon key**, not a service-role key (see `backend/app/supabase_client.py` -
-`get_supabase_client()` reads `SUPABASE_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` in
-`.env` is currently unused) - so tightening RLS to "authenticated only" would break
-the backend too, since the backend never authenticates as a real Supabase user.
-Properly fixing this later means either (a) moving all admin writes to using the
-service-role key server-side and locking RLS down to owner-only for everything else,
-or (b) implementing real Supabase Auth for admins and keying RLS off `auth.uid()`.
-Either is a real project, not a quick patch.
+Verified directly against the live Supabase project, not just assumed: every
+sensitive table now returns `[]` to the anon key on SELECT and a 401 RLS
+violation on INSERT; the four public tables still SELECT real data but a real
+row's UPDATE/DELETE via the anon key provably changes nothing (checked via the
+service-role key before and after, not just a 200/204 status code, which can be
+misleading - PostgREST returns success codes even when RLS silently matched
+zero rows). Every customer-facing and admin flow was exercised live after each
+change: placing a real booking (including the blocked-dates side effect),
+placing a real order, and every admin page (products + image upload, rentals
+calendar + bookings + delivery options, orders, settings, dashboard).
 
-## 2. `admin_users` is one of those publicly-readable tables
+**Two real, pre-existing bugs surfaced as a side effect** of switching to the
+service-role key (both were masked by RLS silently no-op'ing the write, no
+error, so nothing ever surfaced them before): `admin_change_password()`'s write
+to the `admin_users` table had never actually persisted - only the in-memory
+fallback dict was ever really updated, so a changed password would have been
+lost on server restart. And the public `DELETE /api/payments/<id>` /
+`DELETE /api/messages/<id>` endpoints were silently no-ops (no DELETE policy
+existed for the anon key on those tables) - deleting a payment or message
+"succeeded" but never removed anything. Both now work correctly.
 
-Specifically because of #1: `admin_users` has `SELECT` open to `anon`. Combined with
-the plaintext password column (see #3), anyone with the anon key can read every admin
-username and password directly from Postgres, with a single unauthenticated REST call
-- no login attempt, no rate limit, no Flask involvement at all.
+## 2. `admin_users` is one of those publicly-readable tables — FIXED
 
-**Mitigating factor right now:** the anon key isn't currently shipped anywhere a
-visitor could see it. `frontend/lib/supabase/client.ts` (the one place a client-side
-Supabase key would plausibly live) is an intentional stub - the frontend talks to the
-Flask backend only, never to Supabase directly. The anon key only exists in
-`backend/.env` (never committed - confirmed) and in Supabase's own dashboard. It's
-also not hardcoded in the deployed backend, though see #7 below for how close that
-came to changing tonight.
+Fixed as part of #1 above: the `admin_users` SELECT policy was dropped along
+with everything else on that table. Anyone with the anon key used to be able to
+read every admin username and the plaintext password (see #3) directly from
+Postgres with one unauthenticated REST call - confirmed empirically before this
+fix (the live password came back in the response) and after (empty array).
+
+**Note this does NOT affect Mujtaba's own workflow of reading the password
+directly from the Supabase dashboard.** The Table Editor and SQL Editor in
+Supabase Studio authenticate via his own logged-in Supabase account against
+Supabase's management plane - an entirely separate system from the project's
+public REST API and its anon/service-role keys. RLS policies only govern access
+through that public REST API; they have never applied to, and still don't
+apply to, the dashboard itself. This is standard, documented Supabase behavior,
+not something this change altered - confirmed by design, not by testing (there
+was no way to test his actual dashboard session from this environment).
 
 ## 3. Admin passwords are stored and compared in plaintext
 
@@ -133,25 +154,21 @@ sanitized before it's staged.
 ## What's *not* debt (deliberate, already-accepted tradeoffs)
 
 - Plaintext admin password (item 3) - explicit requirement, revisit only if/when the
-  site handles real customer payment data or goes multi-admin.
-- Fully open RLS on customer-facing tables (products read, bookings/orders/messages
-  insert) - reasonable for a public storefront with no customer accounts. The problem
-  is specifically the tables that *shouldn't* be open (`admin_users`, arguably
-  `site_settings` writes and order/payment status), not the pattern itself everywhere.
+  site handles real customer payment data or goes multi-admin. Confirmed unaffected
+  by the RLS lockdown (item 1/2) - reading it from the Supabase dashboard uses
+  Mujtaba's own account session, not the anon/service-role keys RLS governs.
 - No real payment processor integrated - was explicitly out of scope in earlier
   rounds. A Stripe integration was added in the payments round (raw REST calls, no
   SDK), but it has never been tested against a real Stripe account (no credentials
   exist) and stays fully inert until real `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET`
   values are added to `backend/.env` - see `backend/README.md`.
 
-## Note: the payment_settings table is a deliberate exception to item #1
+## Note: payment_settings was the working model for the item #1/#2 fix
 
-Added in the payments round: `payment_settings` (bank account number, Stripe's
-non-secret config) has RLS enabled with **no** anon/authenticated policy at all -
-verified directly against the live Supabase project that the anon key gets an empty
-result from it. Only backend code using the service-role key
-(`get_supabase_admin_client()`) can touch it. This is the one table in the project
-that does NOT follow the "everything open" pattern described in item #1, done
-narrowly for this one sensitive table rather than as a general RLS fix. If item #1 is
-ever tackled properly, this table is a working example of the target pattern
-(service-role key + locked-down RLS) already in production use.
+`payment_settings` (added in the payments round: bank account number, Stripe's
+non-secret config) was the first table in this project locked down to zero anon
+access via the service-role key, before the rest of the RLS lockdown existed as a
+plan. When item #1/#2 were tackled properly in the RLS lockdown round, this table's
+existing pattern (service-role key + RLS with no anon/authenticated policy) is
+exactly what got extended to every other sensitive table in the project - it wasn't
+a one-off exception anymore by the time that round finished, it was the template.

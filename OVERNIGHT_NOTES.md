@@ -8,6 +8,11 @@ written as one document, so here's the map:
 
 - **This "Start here" section** - what's below, and the current prioritized
   recommendations (read this first).
+- **"Round six"** - the RLS lockdown round: switched the backend to the
+  service-role key and locked Row Level Security down on every table
+  (`SECURITY_DEBT.md` items 1 and 2, explicitly approved this round,
+  superseding the earlier "don't touch RLS" instruction), plus surfacing
+  Stripe payment/receipt data in the admin panel.
 - **"Round five"** - the payments round: fixed the unauthenticated debug
   endpoint (approved to act on `SECURITY_DEBT.md` item 4 for the first time),
   added cancel/delete for bookings and orders, product image upload to
@@ -37,10 +42,14 @@ suites pass (99 backend tests via `unittest`, 16 frontend tests via
 at the same row counts it started this engagement at, plus one new table
 (`payment_settings`, singleton row) and 13 new nullable/defaulted columns on
 `site_settings` from round five - every piece of test data created during any
-verification pass across every round (including round five's live end-to-end
-checks against the real Supabase project and a real admin login) was deleted
-or reverted immediately after confirming it worked. Nothing is mid-edit.
-Everything is committed locally; nothing has ever been pushed anywhere.
+verification pass across every round (including round five and six's live
+end-to-end checks against the real Supabase project and a real admin login)
+was deleted or reverted immediately after confirming it worked. As of round
+six, the backend authenticates to Supabase with the service-role key and every
+table's RLS is locked down (zero anon access on sensitive tables, anon-SELECT-
+only on public ones) - verified directly against the live project, not just
+assumed. Nothing is mid-edit. Everything is committed locally; nothing has
+ever been pushed anywhere.
 
 ## Recommended next steps, prioritized
 
@@ -69,22 +78,16 @@ said so rather than padding the list.
    ever matters for an actual out-of-area booking.
 
 **Real projects - only worth it once the business genuinely needs them:**
-4. **RLS/auth hardening** (`SECURITY_DEBT.md` items 1-2 - every table except
-   the new `payment_settings` is writable by anyone with the Supabase anon
-   key, independent of the Flask admin-token layer). This matters a lot
-   *before* this site gets meaningful public traffic, and very little before
-   that. It's also a real project, not a patch - it needs either moving all
-   admin writes to a service-role key with RLS locked down for everyone else,
-   or real Supabase Auth for admins. `payment_settings` (round five) is now a
-   working example of that target pattern already in production use, if this
-   is ever tackled. Don't do this speculatively; do it when a real launch is
-   actually being planned.
-5. **A webhook secret and a live Stripe account, once real transaction volume
+4. **A webhook secret and a live Stripe account, once real transaction volume
    justifies automating reconciliation.** Right now, even once Stripe is
    configured, marking an order paid still depends on the webhook actually
    firing and the secret being set - it's real but minimal, not a full
    payments ops setup (no refund handling, no partial payments, no retry UI).
    Worth revisiting once payment volume makes manual reconciliation painful.
+5. **Real Supabase Auth for admins**, if this ever goes multi-admin. Not
+   needed now - RLS is locked down (round six) independent of whether admin
+   auth is custom-token-based or real Supabase Auth, so this is purely about
+   supporting more than one admin user cleanly, not a security gap.
 
 **Probably not worth doing at all, for a site this size:**
 6. **Making every remaining piece of generic marketing copy DB-editable**
@@ -103,6 +106,147 @@ said so rather than padding the list.
 8. **CI, admin roles/permissions, multi-admin support.** No remote, no
    collaborators, one admin user. Building any of this now would be solving
    problems that don't exist yet.
+9. **Backfilling the payments-round migrations into
+   `frontend/supabase/migrations/`** (noted in round six - those schema
+   changes were only ever applied live via the Supabase MCP tool, never
+   mirrored into the repo the way every other migration is). Low priority:
+   Supabase's own migration history already has the authoritative record: use
+   `mcp__supabase__list_migrations` (or the dashboard's Migrations view) if
+   this is ever needed, rather than treating it as urgent.
+
+---
+
+## Round six (RLS lockdown + Stripe receipts)
+
+Two explicit asks this round, in order: lock down RLS across every table
+(`SECURITY_DEBT.md` items 1-2), then surface Stripe payment/receipt data in
+admin. Mujtaba explicitly approved acting on RLS this time - it had been
+documented-but-untouched all engagement until now, and this explicitly
+supersedes that "don't touch it" instruction, for RLS specifically only.
+Called out as the riskiest change of the engagement, with instructions to plan
+before touching anything, go table by table, verify live after each change
+(not just assert), and commit per table so any single step could be rolled
+back cleanly.
+
+### Part 1: RLS lockdown
+
+**The plan, decided before any change was made:** every table's RLS was wide
+open (`anon, authenticated USING (true)`) for one root-cause reason - the Flask
+backend itself authenticated to Supabase with the anon key, so RLS had to stay
+open just for the app to function; the *actual* access control was Flask's own
+`verify_admin_token` check, enforced only at the app layer. The fix mirrors what
+the payments round already did for `payment_settings`: switch the backend to
+the service-role key (bypasses RLS, and Flask already does its own
+authorization independent of RLS), then lock RLS down purely as a defense-in-
+depth boundary against someone bypassing Flask entirely and hitting Supabase's
+REST API directly with a leaked or found key. Confirmed first that the
+frontend never talks to Supabase directly (`frontend/lib/supabase/client.ts`
+is a genuine unimported stub) - this whole plan depends on that being true.
+
+**Step 1 - the foundational change:** `get_supabase_client()` in
+`backend/app/supabase_client.py` now reads `SUPABASE_SERVICE_ROLE_KEY` instead
+of `SUPABASE_KEY`. Deliberately done and verified *before* touching any RLS
+policy, since with RLS still wide open at that point this is a pure permission
+superset - if something broke here, it would have been an immediate, obvious
+signal to stop, with zero interaction with the RLS changes still to come.
+Verified live against the real Supabase project: public reads, admin login,
+admin reads/writes, and payment settings all still worked exactly as before.
+
+**Two real, previously-invisible bugs surfaced immediately** as a side effect,
+both worth knowing about: `admin_users` had no UPDATE policy for the anon key,
+so `admin_change_password()`'s write to Supabase had been silently failing
+this entire engagement (0 rows matched, no error - PostgREST doesn't error on
+a no-op update) - a changed password only ever persisted to the in-memory
+fallback dict, meaning it would have been lost on any server restart. Verified
+directly: changed the password, confirmed via SQL it now actually updates the
+Supabase row (where it silently didn't before), then reverted immediately.
+Similarly, `payments` and `messages` had no DELETE policy for anon, so the
+public `DELETE /api/payments/<id>` and `/api/messages/<id>` endpoints had been
+silent no-ops - "deleted successfully" without deleting anything. Both are now
+genuinely fixed as a consequence of the key switch, not separately patched.
+
+**Steps 2-11 - table by table**, each its own Supabase migration (mirrored as a
+git-tracked file in `frontend/supabase/migrations/` - see the note below about
+why that matters), its own commit, and live verification before moving on:
+
+- **Zero anon/authenticated access at all** (nothing legitimate ever needs it,
+  now that Flask uses the service-role key): `admin_users`, `payments`,
+  `messages`, `orders`, `bookings`, `rental_availability`. The last one was
+  confirmed dead first - defined in `backend/app/view.py` and exposed at
+  `/api/availability`, but grep-confirmed that `availabilityAPI` in
+  `frontend/lib/api-client.ts` is never called from any page or component;
+  superseded by the global `blocked_dates` calendar. `payment_settings`
+  already had zero anon access from the payments round - unchanged.
+- **Anon SELECT-only** (genuinely public data, but no writes): `products`,
+  `blocked_dates`, `delivery_options`, `site_settings`.
+
+**Verification wasn't just "check the status code."** PostgREST returns a
+misleadingly successful-looking 200/204 for an UPDATE/DELETE that RLS silently
+filtered down to zero matched rows - the same shape of response as a genuinely
+successful operation. So for the SELECT-only tables specifically, verification
+picked a REAL existing row, attempted to change/delete it with the anon key,
+then checked via the service-role key whether the value had *actually* changed
+- confirmed unchanged/still-present in every case, not just "got a 200 back."
+For the zero-access tables, confirmed SELECT returns `[]` and INSERT returns an
+explicit 401 RLS-violation error from PostgREST.
+
+**Every real flow was exercised live**, not just curl'd against the API in
+isolation: placed a real rental booking through the storefront (confirmed the
+`blocked_dates` claim-then-create side effect fired correctly), placed a real
+shop order through cart checkout, and worked through every admin page -
+dashboard stats, products list/create/delete/image-upload, the rentals page
+(global calendar block/unblock, bookings list, delivery options), the orders
+page, and the settings page (general fields + the payment settings section).
+All test data (bookings, orders, payments, blocked dates, a product, a
+delivery option, a stray leftover blocked-date row found during cleanup from
+earlier in this same session) was deleted or reverted immediately after each
+check - the database is back at the exact same baseline row counts as every
+previous round's handover.
+
+**Final consolidated check**, run once at the end across all 11 tables with the
+anon key directly against Supabase's REST API (bypassing Flask entirely - the
+exact attack path this whole round closes): `admin_users`, `bookings`,
+`orders`, `messages`, `payments`, `rental_availability`, and `payment_settings`
+all return `[]`. `products`, `blocked_dates`, `delivery_options`, and
+`site_settings` still return real public data to SELECT, and a real row's
+UPDATE/DELETE via anon changes nothing (re-verified, not just asserted).
+
+**The one compatibility question explicitly flagged - confirmed unaffected:**
+Mujtaba reading the plaintext admin password directly from the Supabase
+dashboard. This still works exactly as before, and always will regardless of
+RLS: the Table Editor and SQL Editor in Supabase Studio authenticate via his
+own logged-in Supabase account against Supabase's management plane - a
+completely separate system from the project's public REST API and the
+anon/service-role keys RLS actually governs. This isn't something the lockdown
+could have broken even in principle; noting it here as a confirmed fact about
+how Supabase works, not as something empirically tested (there's no way to
+test his actual dashboard session from this environment).
+
+**A gap fixed along the way, not originally in scope for this round:** every
+Supabase schema change made in the previous (payments) round - the
+`payment_settings` table, the product-images Storage bucket, the `bookings`
+'cancelled' status, and the 13 new `site_settings` content columns - had only
+ever been applied live via the Supabase MCP tool, never mirrored into
+`frontend/supabase/migrations/` the way the project's own established
+convention expects. This meant the actual schema history wasn't fully
+git-tracked. Fixed going forward: every RLS migration this round has a
+matching file in that directory, so the "commit per table, rollback cleanly"
+instruction is backed by real git history, not just Supabase's own internal
+migration log. The older gap (payments-round migrations never backfilled into
+the repo) was deliberately left alone rather than retroactively fixed, to
+avoid scope creep on an already large, high-risk task - Supabase's own
+`list_migrations` history remains the authoritative record for those if ever
+needed.
+
+Backend test suite unaffected by any of this (all 99 tests mock Supabase
+entirely, so they never exercised the real RLS policies either before or
+after - a real gap in what the suite can catch, worth knowing about rather
+than treating "tests pass" as proof RLS was ever configured correctly. Every
+RLS claim in this round was checked directly against the live database).
+
+### Part 2: Stripe payment/receipt data in admin
+
+[continued below once this part is done]
 
 ---
 
