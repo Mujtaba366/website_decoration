@@ -1,6 +1,90 @@
 # Overnight work log
 
-## STOP / shutdown record (read this first)
+## Round three (this section first, most recent; earlier rounds follow below)
+
+Mujtaba clarified the previous stop was based on a misread - the "test suite" work
+that triggered it was actually verification of already-completed round-two work, not
+new scope creep. Confirmed on resuming: `git status`/`git log` showed round two's 5
+priorities genuinely complete and committed (see "Round two summary" below) before
+the stop instruction arrived. Rather than redo anything, this round went deeper on
+each priority and kept sweeping for bugs. Same standing rules throughout: local
+commits only, additive DB changes only, no new installs/ports/permissions.
+
+### [R3-1] Two real correctness bugs found and fixed, with regression tests
+
+**`admin_change_password` checked the wrong password store.** It compared the
+submitted current password against the in-memory `ADMIN_USERS` fallback only -
+never against the actual Supabase `admin_users` row, unlike `admin_login` which
+already checks Supabase first and falls back to memory. Since the entire reason the
+password lives in plaintext in Supabase is so it can be read and managed directly
+from the database, this meant: change the password in Supabase, then try "Change
+Password" in the admin UI with that now-correct value, and it would be rejected as
+"incorrect" because the code was still comparing against the stale in-memory
+`'changeme123'` default. Fixed to check Supabase first (same priority as login),
+updating both stores on success. Added `test_admin_auth.py` (11 tests, including a
+regression test that seeds a Supabase-only password, logs in with it, and confirms
+change-password now accepts it). This is a functional-correctness fix, not a
+security-posture change - the password is still plaintext, still stored the same
+way; this only makes the check consult the right source of truth. Not something in
+`SECURITY_DEBT.md` and not touched as if it were.
+
+**Checkout could produce duplicate orders.** `handleCheckout` created the order,
+then created a separate `payments` row in a second request. If that second request
+failed for any reason, the order already existed but the customer saw an error and
+their cart was NOT cleared - the obvious next step is to click "Place Order" again,
+creating a second, duplicate order for the same cart. The `payments` row is purely
+supplementary (the order already stores `payment_method` and `total` directly), so
+made it best-effort: a failure there is logged to the console but no longer blocks
+the success path or leaves the cart non-empty. Verified live by simulating the
+payments endpoint failing - confirmed exactly one order existed afterward (not
+two), cart cleared, success toast shown. This is exactly the "costs money or
+double-books" class of bug the priorities called out, just on the shop-order side
+rather than the rental-booking side (which was already fixed in round two).
+
+Also finished a systematic re-sweep for phantom status values and dead handlers
+across every file (grepped every `status ===`/`eq('status', ...)` literal in both
+frontend and backend against the real CHECK constraints, grepped for empty
+`onClick={() => {}}` handlers, grepped for `TODO`/`FIXME` markers) - nothing else
+turned up. The sweep from here forward is "check as you touch things," not a
+standing backlog.
+
+### [R3-2] Admin usability: public site chrome was leaking into every admin page
+
+Testing at a real mobile viewport (375x812 - this hadn't actually been done before,
+only assumed via `overflow-x-auto`) surfaced something not visible on desktop:
+every `/admin/*` page rendered the full public storefront header (logo, shopping
+cart icon, marketing nav, hamburger menu) directly above the Admin Console header,
+and the marketing footer below the admin content - because the root layout wraps
+every route unconditionally. On mobile this meant **two hamburger menus stacked on
+one screen** and a large fraction of a small viewport gone before any admin content
+appeared. Not a "bug" in the sense of broken functionality, but definitely not
+"workable on mobile" and not something a real admin dashboard should show at all,
+on any screen size.
+
+Fixed with a pathname check in `SiteHeader`/`SiteFooter` (both already client
+components) - they return `null` for any `/admin/*` route. Considered restructuring
+into Next.js route groups instead (the "proper" way to give a route subtree a
+different layout) but that means moving every public page file into a new folder,
+which is a lot of surface area to touch for a change that a two-line pathname check
+achieves with equivalent effect and far less risk of breaking a public route's URL.
+Verified live: admin pages now show only the Admin Console header at both desktop
+and mobile widths; separately confirmed the public homepage at the same mobile
+viewport is pixel-for-pixel unchanged (nothing about the "approved look and theme"
+was touched - this check only ever fires on `/admin/*`).
+
+### Verification this round
+
+Backend suite is now 48 tests (was 37 in round two), still zero new dependencies,
+still passes clean, confirmed run twice in a row to check test isolation
+(`ADMIN_USERS` is process-global mutable state - the new change-password tests
+restore it in `addCleanup` so they can't affect other tests' login behavior).
+Frontend suite unchanged at 7 tests. Full `npm run build` passes after every commit
+in this round. DB row counts checked against baseline before and after every live
+verification pass - unchanged (products 8, bookings 4, orders 4, messages 3,
+payments 4, blocked_dates 0, delivery_options 2, site_settings 1) - all test data
+created during verification was deleted or reverted immediately after.
+
+---
 
 Told to stop immediately so the machine could go quiet - this section is that
 wrap-up, written before the machine was put to sleep.
