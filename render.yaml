@@ -10,13 +10,30 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: SUPABASE_URL
-        sync: false # set in Render dashboard - do not commit the real project URL/keys
-      - key: SUPABASE_KEY
-        sync: false # set in Render dashboard - anon key
+        sync: false # set in Render dashboard - the project's API URL, not secret but keep it out of git anyway
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false # REQUIRED - set in Render dashboard. The backend authenticates every Supabase
+        # call with this key (bypasses RLS; Flask does its own admin-token auth independently -
+        # see SECURITY_DEBT.md item 1). Without this set, every request that touches the
+        # database fails. Never commit the real value.
+      - key: SECRET_KEY
+        sync: false # set a real random value in Render dashboard - falls back to an insecure
+        # hardcoded dev default if left unset (fine locally, not for a live site)
       - key: FLASK_ENV
         value: production
       - key: CORS_ORIGINS
-        value: https://website-decoration.onrender.com
+        sync: false # set in Render dashboard to the REAL deployed frontend URL (e.g.
+        # https://<your-frontend-service>.onrender.com). Also used as the fallback base for
+        # Stripe's success/cancel URLs if none are set in Admin > Settings > Payment Settings.
+        # Left as sync:false (rather than a guessed value) so a blueprint sync can never
+        # silently overwrite a correct value already set in the dashboard with a wrong guess.
+      - key: STRIPE_SECRET_KEY
+        sync: false # optional - leave unset until a real Stripe account exists. Card payments
+        # correctly report unavailable rather than erroring when this is unset.
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false # optional - leave unset until a Stripe webhook is registered. The webhook
+        # endpoint safely no-ops (never marks an order paid) from an unverified request when
+        # this is unset.
 
   # Frontend
   - type: web
@@ -27,4 +44,9 @@ services:
     startCommand: npm run start
     envVars:
       - key: NEXT_PUBLIC_API_URL
-        value: https://decoration-website.onrender.com/api
+        sync: false # REQUIRED - set in Render dashboard to the REAL deployed backend URL + /api
+        # (e.g. https://<your-backend-service>.onrender.com/api) BEFORE the first build. This is
+        # a NEXT_PUBLIC_ variable, which Next.js bakes into the client bundle at build time, not
+        # read at runtime - if it's wrong or unset when `npm run build` runs, every page (public
+        # and admin) will call localhost and the whole site will be unable to reach the API.
+        # Left as sync:false rather than a guessed value for the same reason as CORS_ORIGINS above.
