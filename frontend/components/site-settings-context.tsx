@@ -22,6 +22,8 @@ const DEFAULT_SETTINGS: SiteSettings = {
     "Based right here in Auckland, what started as helping a friend style their wedding venue turned into a full-blown obsession with creating beautiful spaces for couples on their big day.\n\n" +
     "We know firsthand how stressful wedding planning can be. There's the budget, the timeline, the endless decisions. That's why we keep things simple: beautiful decorations, fair prices, and we handle the heavy lifting — literally. You pick what you love, we set it up, and you walk into a venue that takes your breath away.\n\n" +
     "Every piece in our collection has been hand-picked and styled with care. We're not a big rental warehouse — we care about every single booking. When you rent from us, you're not just getting decorations. You're getting our time, our attention, and our promise that your venue will look exactly how you imagined it.",
+  how_it_works_heading: 'How It Works',
+  how_it_works_subheading: "Renting decorations should be simple. Here's our straightforward process.",
 };
 
 const SiteSettingsContext = createContext<SiteSettings>(DEFAULT_SETTINGS);

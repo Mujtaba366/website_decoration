@@ -9,8 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Truck, Package, MapPin, Calendar, Check, Clock } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSiteSettings } from '@/components/site-settings-context';
 
 export default function HowItWorksPage() {
+  const { how_it_works_heading, how_it_works_subheading } = useSiteSettings();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
@@ -72,10 +74,10 @@ export default function HowItWorksPage() {
         <div className="absolute inset-0 bg-sage-900/50" />
         <div className="relative z-10 h-full flex flex-col items-center justify-center text-center px-4">
           <h1 className="font-serif text-5xl md:text-6xl font-semibold text-white text-balance">
-            How It Works
+            {how_it_works_heading}
           </h1>
           <p className="mt-4 text-lg text-white/80 max-w-xl">
-            Renting decorations should be simple. Here&apos;s our straightforward process.
+            {how_it_works_subheading}
           </p>
         </div>
       </section>

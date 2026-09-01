@@ -93,4 +93,6 @@ export interface SiteSettings {
   about_heading: string | null;
   about_subheading: string | null;
   about_story: string | null;
+  how_it_works_heading: string | null;
+  how_it_works_subheading: string | null;
 }

@@ -12,6 +12,7 @@ SETTINGS_FIELDS = (
     'location', 'logo_url', 'instagram_handle', 'service_area_note',
     'hero_eyebrow', 'hero_heading', 'hero_subheading',
     'about_heading', 'about_subheading', 'about_story',
+    'how_it_works_heading', 'how_it_works_subheading',
 )
 
 

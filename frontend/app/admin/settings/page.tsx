@@ -20,6 +20,8 @@ interface SiteSettingsForm {
   about_heading: string;
   about_subheading: string;
   about_story: string;
+  how_it_works_heading: string;
+  how_it_works_subheading: string;
 }
 
 const emptySettings: SiteSettingsForm = {
@@ -36,6 +38,8 @@ const emptySettings: SiteSettingsForm = {
   about_heading: '',
   about_subheading: '',
   about_story: '',
+  how_it_works_heading: '',
+  how_it_works_subheading: '',
 };
 
 export default function AdminSettings() {
@@ -83,6 +87,8 @@ export default function AdminSettings() {
             about_heading: data.about_heading || '',
             about_subheading: data.about_subheading || '',
             about_story: data.about_story || '',
+            how_it_works_heading: data.how_it_works_heading || '',
+            how_it_works_subheading: data.how_it_works_subheading || '',
           });
         } else {
           setSettingsError(await describeError(res, 'Failed to load settings'));
@@ -497,6 +503,51 @@ export default function AdminSettings() {
                 disabled={settingsLoading}
                 rows={10}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-sans"
+              />
+            </div>
+            <button
+              onClick={handleSaveSettings}
+              disabled={settingsLoading || settingsSaving}
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-60"
+            >
+              {settingsSaving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+
+        {/* How It Works Page */}
+        <div className="bg-white rounded-lg shadow">
+          <div className="px-6 py-4 border-b border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-900">How It Works Page</h2>
+            <p className="text-sm text-slate-500 mt-1">
+              The banner heading and subheading at the top of the How It Works page.
+            </p>
+          </div>
+          <div className="px-6 py-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Heading
+              </label>
+              <input
+                type="text"
+                placeholder="How It Works"
+                value={settings.how_it_works_heading}
+                onChange={(e) => setSettings({ ...settings, how_it_works_heading: e.target.value })}
+                disabled={settingsLoading}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Subheading
+              </label>
+              <input
+                type="text"
+                placeholder="Renting decorations should be simple..."
+                value={settings.how_it_works_subheading}
+                onChange={(e) => setSettings({ ...settings, how_it_works_subheading: e.target.value })}
+                disabled={settingsLoading}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <button
