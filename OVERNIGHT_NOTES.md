@@ -1,5 +1,226 @@
 # Overnight work log
 
+## Start here
+
+This file is a chronological log of unattended work sessions on this repo, most
+recent first. It grew organically across several sessions rather than being
+written as one document, so here's the map:
+
+- **This "Start here" section** - what's below, and the final prioritized
+  recommendations (read this first).
+- **"Side request, mid-round-three"** - a one-off task (deleted
+  `backend/.env.example`), not part of the numbered round work.
+- **"Round four"** - the closing round: finished the `service_area_note` bug
+  class sweep with regression tests, confirmed the admin mobile fix from round
+  three still holds, added frontend test coverage for the booking/calendar
+  logic, and this handover (this file + the root `README.md`).
+- **"Round three"** - found and fixed two real bugs by re-testing round two's
+  own claimed fixes empirically (a stale-password-check bug, and every admin
+  endpoint downgrading clean 400s into 500s), fixed a real mobile usability
+  problem, fixed a dead settings field, added a third page-hero to the
+  DB-editable content pattern.
+- **"Round two"** and **"Round one"** - the earlier work: migrated the whole
+  stack from Django/Vite to Flask/Next.js, built the rental global-calendar
+  feature end to end (the original ask), added the first automated tests (from
+  zero), hardened the Flask backend, and made the homepage/About page content
+  DB-editable for the first time.
+
+**Current state**: tree builds clean (`npm run build` in `frontend/`), both test
+suites pass (58 backend tests via `unittest`, 16 frontend tests via
+`node --test`, zero new dependencies for either), and the Supabase database is
+at the exact same row counts it started this whole engagement at - every piece
+of test data created during any verification pass across every round was
+deleted or reverted immediately after confirming it worked. Nothing is
+mid-edit. Everything is committed locally; nothing has ever been pushed
+anywhere.
+
+## Recommended next steps, prioritized
+
+Weighted toward what actually helps a 2-person business running this
+themselves, not toward what would look complete in a portfolio. Where I think
+something would be over-engineering for what this site actually needs, I've
+said so rather than padding the list.
+
+**Do soon - small effort, no real downside:**
+1. **Fix the unauthenticated `/api/admin/debug/sessions` endpoint**
+   (`SECURITY_DEBT.md` item 4). It leaks live session tokens and admin
+   usernames to anyone who can reach the backend, no login required. This is a
+   five-minute fix (delete the route, or add the same auth check every other
+   admin route already has) with zero design tradeoffs - unlike the RLS
+   question below, there's no reason to leave this one. Not touched all
+   engagement per the "don't act on SECURITY_DEBT.md" instruction - flagging
+   it as the one item on that list I'd actually just fix.
+2. **Add delete/cancel buttons for bookings and orders in the admin UI.** The
+   backend already supports it (`DELETE /api/bookings/<id>`,
+   `DELETE /api/orders/<id>`) but nothing in `/admin` exposes it - today,
+   removing a spam or test booking means going into Supabase directly. Small,
+   contained UI change (a button + confirm dialog, matching the pattern
+   already used for product delete and calendar unblock).
+
+**Worth doing once it starts to matter - medium effort:**
+3. **Let the admin upload product images instead of pasting a URL.** Right
+   now "Image URL" in the product form means finding somewhere else to host
+   the photo first. Supabase has built-in file storage - wiring that up would
+   be a genuine day-to-day quality-of-life improvement for whoever's adding
+   new rental items regularly. Medium effort (new Supabase Storage bucket +
+   an upload endpoint + a file input in the admin form) but no architectural
+   risk.
+4. **Rate-limit the admin login endpoint** before this is ever reachable from
+   the open internet (it currently isn't - local only). Small effort, clear
+   value the moment this gets a real deployment.
+5. **Verify the Auckland postcode range** (`frontend/lib/date-utils.ts`,
+   flagged repeatedly and never fixed - needs an authoritative NZ
+   postcode-to-region source I couldn't reach under this engagement's
+   no-external-network-calls rule). This affects real delivery-fee logic, so
+   it's worth someone with access to real postcode data checking before it
+   ever matters for an actual out-of-area booking.
+
+**Real projects - only worth it once the business genuinely needs them:**
+6. **RLS/auth hardening** (`SECURITY_DEBT.md` items 1-2 - every table is
+   writable by anyone with the Supabase anon key, independent of the Flask
+   admin-token layer). This matters a lot *before* this site gets meaningful
+   public traffic, and very little before that. It's also a real project, not
+   a patch - it needs either moving all admin writes to a service-role key
+   with RLS locked down for everyone else, or real Supabase Auth for admins.
+   Don't do this speculatively; do it when a real launch is actually being
+   planned.
+7. **Real payment processing** (Stripe or similar). The current flow - place
+   an order, get a manual follow-up with payment details - may just be how a
+   2-person business wants to operate indefinitely. I'd treat automating this
+   as solving a problem only once manual follow-up actually becomes a
+   bottleneck, not before.
+
+**Probably not worth doing at all, for a site this size:**
+8. **A full CMS / page-builder for every piece of copy.** Three page heroes
+   (Home, About, How It Works) plus the header/footer/contact info are now
+   DB-editable, which covers the content that's actually likely to change
+   (business name, contact details, headline messaging). Making the "Values"
+   grid, the 4-step process list, and every other static paragraph editable
+   too would mean building real CMS infrastructure to solve a problem this
+   business probably doesn't have - editing a `.tsx` file directly for copy
+   that changes once a year is genuinely fine.
+9. **True Postgres-transaction atomicity for booking creation** (noted
+   repeatedly as deferred - the current "claim the date, then create the
+   booking, roll back on failure" approach closes the actual race condition
+   but isn't one atomic database transaction). This would only matter at a
+   booking volume this business is unlikely to reach - two customers
+   racing to book the exact literal same millisecond is not a real risk here.
+10. **CI, admin roles/permissions, multi-admin support.** No remote, no
+    collaborators, one admin user. Building any of this now would be solving
+    problems that don't exist yet.
+
+---
+
+## Round four (closing round - see "Start here" above for the recommendations
+## this round's work fed into)
+
+Explicit instructions this round: close out rather than expand scope. Finish the
+`service_area_note` bug-class sweep, confirm the round-three mobile fix holds, add
+frontend test coverage for the booking/calendar path (only if no new dependencies
+needed), then do a proper handover - complete `OVERNIGHT_NOTES.md`, a real project
+README, and a prioritized recommendations list. Explicitly told not to start
+anything from that list.
+
+### [R4-1] Finished the `service_area_note` bug-class sweep, both directions
+
+**Display side** (a field is editable but nothing shows it): checked every field
+the real admin Settings form sends against actual usage on the public site
+(`grep` for each of the 15 field names across every non-admin-form `.tsx` file).
+All 15 are genuinely displayed somewhere - `service_area_note` (fixed last round)
+was the only one with this problem. `logo_url` exists in the schema/types but has
+no admin UI field and nothing renders it either - left alone, since unlike
+`service_area_note` there's no existing UI implying it should do something; it's
+an unbuilt feature, not a broken promise.
+
+**Save side** (the mirror-image bug): `update_settings()` in `admin_settings.py`
+silently drops any field not in its `SETTINGS_FIELDS` whitelist tuple - no error,
+200 response, the field just never gets written. Confirmed by hand that today's
+whitelist matches today's form field-for-field, then added
+`backend/tests/test_admin_settings.py` (6 tests) so that stays true: PUTs every
+field the real form sends, GETs it back, asserts each one round-tripped. This is
+regression protection specifically against a future form field being added
+without remembering to whitelist it on the backend - exactly how
+`service_area_note` likely happened in the first place, just for a field that
+already existed everywhere instead of the wiring being missing entirely.
+
+### [R4-2] Confirmed the round-three admin mobile fix still holds
+
+No code changes needed - `grep` confirmed the `pathname?.startsWith('/admin')`
+check is still in place in both `SiteHeader` and `SiteFooter`, unchanged since
+round three landed it. Logged as explicitly checked rather than assumed, per the
+instruction to close this out.
+
+### [R4-3] Frontend test coverage for the booking/calendar path
+
+Extracted two more pieces of calendar logic into `frontend/lib/date-utils.ts`
+(joining `toDateOnly`/`isWithinAuckland` from earlier rounds), removing
+duplication and making them independently testable:
+
+- **`fromDateOnly()`** - the inverse of `toDateOnly`, parsing `"YYYY-MM-DD"` into
+  a local-midnight `Date`. Was duplicated inline in the admin Rentals page's
+  calendar-modifier conversion. Comes with the mirror-image regression guard of
+  `toDateOnly`'s: never use `new Date(dateStr)` for this, since that parses as
+  UTC midnight - the same off-by-one-day bug as `toISOString()`, just running
+  the other direction.
+- **`isDateAvailable()`** - the actual logic deciding whether a customer can pick
+  a date on the booking calendar: not in the past, not in the global
+  blocked-dates set. Takes `today` as a parameter (default `new Date()`)
+  specifically so it's testable against a fixed date instead of whatever day the
+  test suite happens to run on - this is the highest-value piece of this
+  session's ask, since it's the actual gatekeeper logic for the feature the
+  whole engagement was originally about.
+
+Also removed `blockedDateSet` in the admin Rentals page - a computed value that
+was assigned but never read anywhere, found while touching this code for the
+`fromDateOnly` swap. Added 9 new tests (7 → 16 total in
+`frontend/lib/date-utils.test.ts`).
+
+**Verified live after the refactor**, not just via unit tests: selected a date on
+the real product page's calendar (confirms `isDateAvailable`'s actual call site
+still works after the extraction), blocked a date on the real admin Rentals
+calendar and confirmed it visually renders with the "blocked" style (confirms
+`fromDateOnly`'s actual call site - the calendar's date-modifier conversion -
+still works), cleaned up all test data afterward.
+
+### [R4-4] Handover
+
+Wrote the root `README.md` (didn't exist before this engagement - see the
+`ADMIN_BACKEND_SETUP.txt` note in round one/two about the earlier docs being
+deleted in the Django→Flask migration and never replaced). Verified the
+documented backend run command actually works by running it
+(`venv/Scripts/python.exe backend/web.py` from the repo root, hit
+`/api/health`, got a clean 200) rather than just writing down what I assumed
+would work - then made sure to actually clean up the process afterward
+(Flask's debug reloader runs as more than one process; a plain `kill` on the
+shell job left a child still listening on port 5000, caught by checking
+`netstat` after, not by assuming the kill worked).
+
+This file's "Start here" section at the top (see above) is the other half of
+the handover - an index across all four rounds plus the final prioritized
+recommendations list, so this file works as a complete standalone record
+rather than requiring the chat history it came from.
+
+### Verification this round
+
+Backend suite: 52 → 58 tests. Frontend suite: 7 → 16 tests. Both suites and a
+full `npm run build` verified passing before every commit this round. DB row
+counts checked against baseline before and after every live verification pass -
+unchanged from every previous round's baseline (products 8, bookings 4, orders
+4, messages 3, payments 4, blocked_dates 0, delivery_options 2, site_settings
+1). All test data created this round (a blocked test date, form-submitted test
+settings values) was deleted or reverted immediately after confirming it worked.
+
+### Commit log, round four (oldest first)
+
+1. `test: settings save/load round-trip - the service_area_note bug class`
+2. `test: frontend coverage for the booking/calendar availability logic`
+3. (this file, and the new root `README.md` - committed together as the
+   handover)
+
+All local only - no remote configured, nothing pushed, nothing deployed.
+
+---
+
 ## Side request, mid-round-three: deleted backend/.env.example
 
 Mujtaba's explicit decision: not rotating the service-role key (repo is private,
