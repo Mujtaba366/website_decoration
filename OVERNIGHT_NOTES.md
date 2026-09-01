@@ -1,5 +1,42 @@
 # Overnight work log
 
+## Side request, mid-round-three: deleted backend/.env.example
+
+Mujtaba's explicit decision: not rotating the service-role key (repo is private,
+and the real values were scrubbed before they ever entered git history - see round
+one's [1] entry below). He asked for `backend/.env.example` deleted outright, since
+its mere presence implies "safe template, fill in and commit" - which is exactly
+the mistake round one caught and fixed once already.
+
+Before deleting, per his explicit instructions, checked:
+- **Nothing references it by path** anywhere in the repo (code, `render.yaml`, or
+  docs) except this file's and `SECURITY_DEBT.md`'s own historical account of
+  finding real secrets in it - left those alone, they describe a past incident,
+  not a dependency on the file existing.
+- **`backend/.env` is present and gitignored** - confirmed with
+  `git check-ignore -v backend/.env` (matches `.gitignore:44`).
+- **It was the only place the backend's variable-name list was documented
+  anywhere in the repo.** There's no root README (deleted in the earlier stack
+  migration, never replaced). The pile of `ADMIN_*.md` docs only ever mention the
+  *frontend's* `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` pair - a
+  stale, currently-unused variable pair from an earlier design where the frontend
+  talked to Supabase directly (it doesn't today - `frontend/lib/supabase/client.ts`
+  is an intentional unused stub, per `SECURITY_DEBT.md`). None of them document the
+  backend's actual list (`SUPABASE_URL`, `SUPABASE_KEY`,
+  `SUPABASE_SERVICE_ROLE_KEY`, `CORS_ORIGINS`, etc).
+
+Since it was the only record, moved the variable list into a new
+**`backend/README.md`** (placeholder values only, same as `.env.example` had)
+before deleting the file - didn't just delete and lose the reference. Also noted
+which variables are actually read by the code today (`SUPABASE_URL`/`SUPABASE_KEY`
+only, confirmed by grepping every `.py` file for each variable name) versus
+informational/deploy-time-only/reserved-for-unbuilt-features, so that distinction
+survives too. Verified the full backend test suite still passes (nothing in the
+codebase ever imported or read `.env.example` itself). Committed separately:
+`docs: replace backend/.env.example with backend/README.md env var reference`.
+
+---
+
 ## Round three (this section first, most recent; earlier rounds follow below)
 
 Mujtaba clarified the previous stop was based on a misread - the "test suite" work
