@@ -72,17 +72,104 @@ and mobile widths; separately confirmed the public homepage at the same mobile
 viewport is pixel-for-pixel unchanged (nothing about the "approved look and theme"
 was touched - this check only ever fires on `/admin/*`).
 
+### [R3-3] Two more real bugs found by re-verifying round two's own resilience fix
+
+Went back and empirically re-tested round two's "malformed JSON returns clean
+400/415" fix with `curl` against the actually-running dev server, rather than
+trusting that adding the global handlers in `web.py` was the whole story. It wasn't:
+
+**Every `admin_*.py` endpoint downgraded a clean 400/415 into a misleading 500.**
+Each one wraps its entire body - including the `request.get_json()` call - in one
+broad `except Exception`. Flask's `get_json()` raises a werkzeug
+`BadRequest`/`UnsupportedMediaType` on malformed JSON or a missing `Content-Type`
+header, and those exceptions ARE `Exception` subclasses, so the broad `except`
+caught them *before* they could reach the global handlers round two added -
+converting a correctly-classified 400/415 client error into a generic 500
+`"Internal server error"` with a raw Postgres-adjacent-looking traceback string
+leaked into the response. Confirmed with `curl` before touching anything: a valid
+admin token + malformed JSON against `/api/admin/products` returned 500 with
+`"Failed to decode JSON object"` in the details field. Fixed by switching every
+`request.get_json()` call to `request.get_json(silent=True)` - 10 call sites across
+the 6 `admin_*.py` files, plus the 11 inline calls in `route.py`'s public route
+registrations (same underlying issue there, and it unifies the error message with
+each endpoint's own `require_body`-based wording instead of the generic global
+handler text). Reconfirmed with `curl` after the fix: clean 400 every time. Added 4
+regression tests hitting this exact scenario against three different admin
+endpoints, explicitly asserting `!= 500`.
+
+**`service_area_note` was editable but connected to nothing.** This setting has
+existed in `site_settings` and the admin Settings form since the very first
+session, but nothing on the public site ever read it - an admin could type
+something in and hit Save, and literally nothing visible would happen anywhere.
+Its default value is word-for-word the second sentence of the Rentals page's
+hardcoded intro paragraph, which is a strong signal this was the intended
+destination and it simply never got wired up. Fixed: Rentals page now renders that
+sentence from `useSiteSettings()` instead of a hardcoded literal. This is the same
+"control that does nothing" bug class from the correctness-sweep priority, just
+applied to a settings field instead of a button - worth checking other unused
+`site_settings` columns the same way if this keeps coming up (`logo_url` is defined
+in the schema/types but has no admin UI field and nothing renders it either - left
+alone since, unlike `service_area_note`, there's no existing UI promising it does
+something; it just doesn't exist as a feature yet, which isn't a bug).
+
 ### Verification this round
 
-Backend suite is now 48 tests (was 37 in round two), still zero new dependencies,
-still passes clean, confirmed run twice in a row to check test isolation
-(`ADMIN_USERS` is process-global mutable state - the new change-password tests
-restore it in `addCleanup` so they can't affect other tests' login behavior).
-Frontend suite unchanged at 7 tests. Full `npm run build` passes after every commit
-in this round. DB row counts checked against baseline before and after every live
-verification pass - unchanged (products 8, bookings 4, orders 4, messages 3,
-payments 4, blocked_dates 0, delivery_options 2, site_settings 1) - all test data
-created during verification was deleted or reverted immediately after.
+Backend suite is now 52 tests (was 37 at the start of round two, 48 after the first
+half of round three), still zero new dependencies, confirmed passing twice in a row
+for test isolation. Frontend suite unchanged at 7 tests, typecheck clean. Full
+`npm run build` passes after every commit in this round. Mobile viewport (375x812)
+actually tested (not just assumed) on `/admin/products` and `/admin/rentals` after
+the header/footer fix - both genuinely usable: single-column layouts stack
+correctly, the calendar fits and is touch-usable, wide tables scroll horizontally
+within their own container (confirmed the scrollbar is on the table, not the page).
+DB row counts checked against baseline before and after every live verification
+pass throughout this round - unchanged (products 8, bookings 4, orders 4, messages
+3, payments 4, blocked_dates 0, delivery_options 2, site_settings 1) - every piece
+of test data created during verification (test products, test bookings, test
+orders, a test settings edit) was deleted or reverted immediately after confirming
+it worked.
+
+### Round three summary
+
+All 5 priorities got real, verified work - two of the five findings this round
+(`admin_change_password`'s wrong password source, the malformed-JSON 500s) were
+found specifically *by* re-verifying round two's own claimed fixes empirically
+rather than trusting the code read-through, which is the pattern worth repeating:
+test the actual running server, not just the diff.
+
+1. **Test suite**: 37 → 52 backend tests, 7 frontend tests unchanged, zero new
+   dependencies throughout.
+2. **Correctness sweep**: finished the systematic re-check (phantom status values,
+   dead handlers) and found two bugs the sweep-by-reading missed:
+   `admin_change_password`'s stale password source, and the checkout
+   duplicate-order risk.
+3. **Resilience**: found and fixed the malformed-JSON-becomes-500 regression across
+   every admin endpoint - this is the single most impactful fix this round, since
+   it affects literally every admin write endpoint the same way.
+4. **Admin depth**: fixed the public-header/footer-leaking-into-admin-pages issue,
+   verified genuinely mobile-usable at a real viewport for the first time.
+5. **DB content**: fixed `service_area_note`'s dead wiring - smaller in scope than
+   round two's hero/about work, but a real bug fix rather than new customization
+   surface, which felt like the right thing to prioritize given what the sweep
+   turned up.
+
+### Needs permission / blocked (unchanged from round two)
+
+Still just the Auckland postcode range question from round two's [R2-1] - needs an
+authoritative external NZ postcode source, which this round's rules don't allow
+reaching for. Nothing new got blocked this round.
+
+### Commit log, round three (oldest first)
+
+1. `docs: round three progress checkpoint` (mid-round checkpoint, superseded by this
+   final summary)
+2. `fix: change-password checked stale in-memory data, not Supabase`
+3. `fix: checkout could produce duplicate orders on a payment-record failure`
+4. `fix: admin pages no longer show the public storefront header/footer`
+5. `fix: malformed JSON on any endpoint returned 500 instead of 400/415`
+6. `fix: service_area_note setting was editable but never displayed anywhere`
+
+All local only - no remote configured, nothing pushed.
 
 ---
 
