@@ -22,11 +22,11 @@ export const metadata: Metadata = {
   description:
     'Auckland-based wedding decoration rentals and personalized shop items. Arches, backdrops, florals, benches, and more — we set it up or you pick it up.',
   openGraph: {
-    images: [{ url: 'https://bolt.new/static/og_default.png' }],
+    images: [{ url: 'https://images.pexels.com/photos/14703685/pexels-photo-14703685.jpeg?auto=compress&cs=tinysrgb&w=1200&h=630' }],
   },
   twitter: {
     card: 'summary_large_image',
-    images: [{ url: 'https://bolt.new/static/og_default.png' }],
+    images: [{ url: 'https://images.pexels.com/photos/14703685/pexels-photo-14703685.jpeg?auto=compress&cs=tinysrgb&w=1200&h=630' }],
   },
 };
 

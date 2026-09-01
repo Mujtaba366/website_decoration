@@ -2,12 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Flower2, Mail, Phone, MapPin, Instagram } from 'lucide-react';
+import { Flower2, Mail, Phone, MapPin, Instagram, Clock } from 'lucide-react';
 import { useSiteSettings } from '@/components/site-settings-context';
 
 export function SiteFooter() {
   const pathname = usePathname();
-  const { site_name, tagline, support_email, phone, location, instagram_handle } = useSiteSettings();
+  const { site_name, tagline, support_email, phone, location, instagram_handle, business_hours, footer_note } = useSiteSettings();
 
   // Same reasoning as SiteHeader: admin pages shouldn't show the public
   // storefront footer (marketing links, social handles) below the admin UI.
@@ -63,6 +63,11 @@ export function SiteFooter() {
                   <Instagram className="h-4 w-4 text-sage-500" /> {instagram_handle}
                 </li>
               )}
+              {business_hours && (
+                <li className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-sage-500" /> {business_hours}
+                </li>
+              )}
             </ul>
           </div>
         </div>
@@ -72,7 +77,7 @@ export function SiteFooter() {
             &copy; {new Date().getFullYear()} {site_name}. All rights reserved.
           </p>
           <p className="text-xs text-muted-foreground">
-            Made with care in Auckland, Aotearoa.
+            {footer_note}
           </p>
         </div>
       </div>

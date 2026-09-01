@@ -14,14 +14,28 @@ interface SiteSettingsForm {
   location: string;
   instagram_handle: string;
   service_area_note: string;
+  business_hours: string;
+  footer_note: string;
   hero_eyebrow: string;
   hero_heading: string;
   hero_subheading: string;
+  cta_heading: string;
+  cta_subheading: string;
   about_heading: string;
   about_subheading: string;
   about_story: string;
   how_it_works_heading: string;
   how_it_works_subheading: string;
+  contact_heading: string;
+  contact_subheading: string;
+  contact_intro_heading: string;
+  contact_intro_text: string;
+  rentals_eyebrow: string;
+  rentals_heading: string;
+  rentals_subheading: string;
+  shop_eyebrow: string;
+  shop_heading: string;
+  shop_subheading: string;
 }
 
 const emptySettings: SiteSettingsForm = {
@@ -32,14 +46,28 @@ const emptySettings: SiteSettingsForm = {
   location: '',
   instagram_handle: '',
   service_area_note: '',
+  business_hours: '',
+  footer_note: '',
   hero_eyebrow: '',
   hero_heading: '',
   hero_subheading: '',
+  cta_heading: '',
+  cta_subheading: '',
   about_heading: '',
   about_subheading: '',
   about_story: '',
   how_it_works_heading: '',
   how_it_works_subheading: '',
+  contact_heading: '',
+  contact_subheading: '',
+  contact_intro_heading: '',
+  contact_intro_text: '',
+  rentals_eyebrow: '',
+  rentals_heading: '',
+  rentals_subheading: '',
+  shop_eyebrow: '',
+  shop_heading: '',
+  shop_subheading: '',
 };
 
 export default function AdminSettings() {
@@ -81,14 +109,28 @@ export default function AdminSettings() {
             location: data.location || '',
             instagram_handle: data.instagram_handle || '',
             service_area_note: data.service_area_note || '',
+            business_hours: data.business_hours || '',
+            footer_note: data.footer_note || '',
             hero_eyebrow: data.hero_eyebrow || '',
             hero_heading: data.hero_heading || '',
             hero_subheading: data.hero_subheading || '',
+            cta_heading: data.cta_heading || '',
+            cta_subheading: data.cta_subheading || '',
             about_heading: data.about_heading || '',
             about_subheading: data.about_subheading || '',
             about_story: data.about_story || '',
             how_it_works_heading: data.how_it_works_heading || '',
             how_it_works_subheading: data.how_it_works_subheading || '',
+            contact_heading: data.contact_heading || '',
+            contact_subheading: data.contact_subheading || '',
+            contact_intro_heading: data.contact_intro_heading || '',
+            contact_intro_text: data.contact_intro_text || '',
+            rentals_eyebrow: data.rentals_eyebrow || '',
+            rentals_heading: data.rentals_heading || '',
+            rentals_subheading: data.rentals_subheading || '',
+            shop_eyebrow: data.shop_eyebrow || '',
+            shop_heading: data.shop_heading || '',
+            shop_subheading: data.shop_subheading || '',
           });
         } else {
           setSettingsError(await describeError(res, 'Failed to load settings'));
@@ -310,6 +352,34 @@ export default function AdminSettings() {
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Business Hours
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Mon–Fri 9am–5pm (leave blank to hide)"
+                  value={settings.business_hours}
+                  onChange={(e) => setSettings({ ...settings, business_hours: e.target.value })}
+                  disabled={settingsLoading}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-slate-500 mt-1">Shown in the footer and on the Contact page. Leave blank to hide it entirely.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Footer Note
+                </label>
+                <input
+                  type="text"
+                  placeholder="Made with care in Auckland, Aotearoa."
+                  value={settings.footer_note}
+                  onChange={(e) => setSettings({ ...settings, footer_note: e.target.value })}
+                  disabled={settingsLoading}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-slate-500 mt-1">The small line at the very bottom of every page, next to the copyright.</p>
+              </div>
               <button
                 onClick={handleSaveSettings}
                 disabled={settingsLoading || settingsSaving}
@@ -441,6 +511,239 @@ export default function AdminSettings() {
                 placeholder="A sentence or two describing what you offer"
                 value={settings.hero_subheading}
                 onChange={(e) => setSettings({ ...settings, hero_subheading: e.target.value })}
+                disabled={settingsLoading}
+                rows={3}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <button
+              onClick={handleSaveSettings}
+              disabled={settingsLoading || settingsSaving}
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-60"
+            >
+              {settingsSaving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+
+        {/* Homepage CTA banner */}
+        <div className="bg-white rounded-lg shadow">
+          <div className="px-6 py-4 border-b border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-900">Homepage Call-to-Action</h2>
+            <p className="text-sm text-slate-500 mt-1">
+              The banner near the bottom of the homepage that invites visitors to get in touch.
+            </p>
+          </div>
+          <div className="px-6 py-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Heading
+              </label>
+              <input
+                type="text"
+                placeholder="Ready to bring your vision to life?"
+                value={settings.cta_heading}
+                onChange={(e) => setSettings({ ...settings, cta_heading: e.target.value })}
+                disabled={settingsLoading}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Subheading
+              </label>
+              <input
+                type="text"
+                placeholder="Tell us about your wedding and we'll help you choose the perfect pieces."
+                value={settings.cta_subheading}
+                onChange={(e) => setSettings({ ...settings, cta_subheading: e.target.value })}
+                disabled={settingsLoading}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <button
+              onClick={handleSaveSettings}
+              disabled={settingsLoading || settingsSaving}
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-60"
+            >
+              {settingsSaving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+
+        {/* Rentals Page */}
+        <div className="bg-white rounded-lg shadow">
+          <div className="px-6 py-4 border-b border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-900">Rentals Page</h2>
+            <p className="text-sm text-slate-500 mt-1">
+              The banner at the top of the Rentals page.
+            </p>
+          </div>
+          <div className="px-6 py-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Eyebrow (small label above the heading)
+              </label>
+              <input
+                type="text"
+                placeholder="Decoration Rentals"
+                value={settings.rentals_eyebrow}
+                onChange={(e) => setSettings({ ...settings, rentals_eyebrow: e.target.value })}
+                disabled={settingsLoading}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Heading
+              </label>
+              <input
+                type="text"
+                placeholder="Rent the Perfect Setting"
+                value={settings.rentals_heading}
+                onChange={(e) => setSettings({ ...settings, rentals_heading: e.target.value })}
+                disabled={settingsLoading}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Subheading
+              </label>
+              <textarea
+                placeholder="Choose from our collection of floral arches, backdrops, benches, and more."
+                value={settings.rentals_subheading}
+                onChange={(e) => setSettings({ ...settings, rentals_subheading: e.target.value })}
+                disabled={settingsLoading}
+                rows={2}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-xs text-slate-500 mt-1">The Service Area Note from the General card is appended automatically after this.</p>
+            </div>
+            <button
+              onClick={handleSaveSettings}
+              disabled={settingsLoading || settingsSaving}
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-60"
+            >
+              {settingsSaving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+
+        {/* Shop Page */}
+        <div className="bg-white rounded-lg shadow">
+          <div className="px-6 py-4 border-b border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-900">Shop Page</h2>
+            <p className="text-sm text-slate-500 mt-1">
+              The banner at the top of the Shop page.
+            </p>
+          </div>
+          <div className="px-6 py-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Eyebrow (small label above the heading)
+              </label>
+              <input
+                type="text"
+                placeholder="Wedding Shop"
+                value={settings.shop_eyebrow}
+                onChange={(e) => setSettings({ ...settings, shop_eyebrow: e.target.value })}
+                disabled={settingsLoading}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Heading
+              </label>
+              <input
+                type="text"
+                placeholder="Keepsakes & Personalized Gifts"
+                value={settings.shop_heading}
+                onChange={(e) => setSettings({ ...settings, shop_heading: e.target.value })}
+                disabled={settingsLoading}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Subheading
+              </label>
+              <textarea
+                placeholder="Personalized glasses, ring boxes, and hand-crafted bouquets..."
+                value={settings.shop_subheading}
+                onChange={(e) => setSettings({ ...settings, shop_subheading: e.target.value })}
+                disabled={settingsLoading}
+                rows={2}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <button
+              onClick={handleSaveSettings}
+              disabled={settingsLoading || settingsSaving}
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-60"
+            >
+              {settingsSaving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+
+        {/* Contact Page */}
+        <div className="bg-white rounded-lg shadow">
+          <div className="px-6 py-4 border-b border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-900">Contact Page</h2>
+            <p className="text-sm text-slate-500 mt-1">
+              The banner and intro text on the Contact page (the contact details themselves come from the General card above).
+            </p>
+          </div>
+          <div className="px-6 py-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Banner Heading
+              </label>
+              <input
+                type="text"
+                placeholder="Get in Touch"
+                value={settings.contact_heading}
+                onChange={(e) => setSettings({ ...settings, contact_heading: e.target.value })}
+                disabled={settingsLoading}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Banner Subheading
+              </label>
+              <input
+                type="text"
+                placeholder="Questions about rentals, custom requests, or just want to say hello?"
+                value={settings.contact_subheading}
+                onChange={(e) => setSettings({ ...settings, contact_subheading: e.target.value })}
+                disabled={settingsLoading}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Intro Heading
+              </label>
+              <input
+                type="text"
+                placeholder="We'd love to hear from you"
+                value={settings.contact_intro_heading}
+                onChange={(e) => setSettings({ ...settings, contact_intro_heading: e.target.value })}
+                disabled={settingsLoading}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Intro Text
+              </label>
+              <textarea
+                placeholder="Whether you're planning a wedding..."
+                value={settings.contact_intro_text}
+                onChange={(e) => setSettings({ ...settings, contact_intro_text: e.target.value })}
                 disabled={settingsLoading}
                 rows={3}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"

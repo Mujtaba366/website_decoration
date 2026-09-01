@@ -14,7 +14,7 @@ import { useSiteSettings } from '@/components/site-settings-context';
 const rentalCategories = ['Arches', 'Backdrops', 'Benches', 'Florals', 'Table Settings', 'Signs'];
 
 export default function RentalsPage() {
-  const { service_area_note } = useSiteSettings();
+  const { service_area_note, rentals_eyebrow, rentals_heading, rentals_subheading } = useSiteSettings();
   const { data: allProducts = [], loading } = useApi(() => productsAPI.list(), []);
   const [selectedCats, setSelectedCats] = useState<string[]>([]);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
@@ -40,13 +40,13 @@ export default function RentalsPage() {
     <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
       <div className="text-center mb-10">
         <p className="text-blush-600 text-sm font-medium tracking-[0.2em] uppercase mb-3">
-          Decoration Rentals
+          {rentals_eyebrow}
         </p>
         <h1 className="font-serif text-4xl md:text-5xl font-semibold text-sage-800">
-          Rent the Perfect Setting
+          {rentals_heading}
         </h1>
         <p className="mt-4 text-muted-foreground max-w-xl mx-auto">
-          Choose from our collection of floral arches, backdrops, benches, and more.{' '}
+          {rentals_subheading}{' '}
           {service_area_note}
         </p>
       </div>

@@ -13,7 +13,7 @@ import { useSiteSettings } from '@/components/site-settings-context';
 
 export default function Home() {
   const { data: allProducts = [], loading } = useApi(() => productsAPI.list(), []);
-  const { hero_eyebrow, hero_heading, hero_subheading } = useSiteSettings();
+  const { hero_eyebrow, hero_heading, hero_subheading, cta_heading, cta_subheading } = useSiteSettings();
 
   // Get first 6 featured products
   const featured = Array.isArray(allProducts) ? allProducts.slice(0, 6) : [];
@@ -129,10 +129,10 @@ export default function Home() {
         <div className="relative z-10 py-24 text-center px-4">
           <Sparkles className="h-8 w-8 text-blush-300 mx-auto mb-4" />
           <h2 className="font-serif text-4xl md:text-5xl font-semibold text-white max-w-2xl mx-auto text-balance">
-            Ready to bring your vision to life?
+            {cta_heading}
           </h2>
           <p className="mt-4 text-white/80 text-lg max-w-xl mx-auto">
-            Tell us about your wedding and we&apos;ll help you choose the perfect pieces.
+            {cta_subheading}
           </p>
           <Link href="/contact">
             <Button size="lg" className="mt-8 bg-blush-500 hover:bg-blush-600 text-white px-8">

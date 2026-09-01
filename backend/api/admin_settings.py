@@ -10,9 +10,15 @@ from app.supabase_client import get_supabase_client
 SETTINGS_FIELDS = (
     'site_name', 'tagline', 'support_email', 'phone',
     'location', 'logo_url', 'instagram_handle', 'service_area_note',
+    'business_hours', 'footer_note',
     'hero_eyebrow', 'hero_heading', 'hero_subheading',
+    'cta_heading', 'cta_subheading',
     'about_heading', 'about_subheading', 'about_story',
     'how_it_works_heading', 'how_it_works_subheading',
+    'contact_heading', 'contact_subheading',
+    'contact_intro_heading', 'contact_intro_text',
+    'rentals_eyebrow', 'rentals_heading', 'rentals_subheading',
+    'shop_eyebrow', 'shop_heading', 'shop_subheading',
 )
 
 

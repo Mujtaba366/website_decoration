@@ -24,7 +24,7 @@ export interface CartItem {
   personalization?: string;
 }
 
-export type BookingStatus = 'enquiry' | 'confirmed' | 'paid' | 'completed';
+export type BookingStatus = 'enquiry' | 'confirmed' | 'paid' | 'completed' | 'cancelled';
 
 export interface Booking {
   id: string;
@@ -87,12 +87,26 @@ export interface SiteSettings {
   logo_url: string | null;
   instagram_handle: string | null;
   service_area_note: string | null;
+  business_hours: string | null;
+  footer_note: string | null;
   hero_eyebrow: string | null;
   hero_heading: string | null;
   hero_subheading: string | null;
+  cta_heading: string | null;
+  cta_subheading: string | null;
   about_heading: string | null;
   about_subheading: string | null;
   about_story: string | null;
   how_it_works_heading: string | null;
   how_it_works_subheading: string | null;
+  contact_heading: string | null;
+  contact_subheading: string | null;
+  contact_intro_heading: string | null;
+  contact_intro_text: string | null;
+  rentals_eyebrow: string | null;
+  rentals_heading: string | null;
+  rentals_subheading: string | null;
+  shop_eyebrow: string | null;
+  shop_heading: string | null;
+  shop_subheading: string | null;
 }

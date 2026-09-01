@@ -13,9 +13,13 @@ const DEFAULT_SETTINGS: SiteSettings = {
   logo_url: null,
   instagram_handle: '@bloomandvow',
   service_area_note: 'We deliver and set up across Auckland, or you can pick it up yourself.',
+  business_hours: null,
+  footer_note: 'Made with care in Auckland, Aotearoa.',
   hero_eyebrow: 'Auckland Wedding Decorations',
   hero_heading: 'Beautiful spaces for your perfect day',
   hero_subheading: 'Stunning floral arches, backdrops, and table settings for rent. Personalized keepsakes for your wedding. We set it up — you say "I do."',
+  cta_heading: 'Ready to bring your vision to life?',
+  cta_subheading: "Tell us about your wedding and we'll help you choose the perfect pieces.",
   about_heading: 'Our Story',
   about_subheading: 'A passion for beautiful weddings and creating unforgettable moments.',
   about_story:
@@ -24,6 +28,16 @@ const DEFAULT_SETTINGS: SiteSettings = {
     "Every piece in our collection has been hand-picked and styled with care. We're not a big rental warehouse — we care about every single booking. When you rent from us, you're not just getting decorations. You're getting our time, our attention, and our promise that your venue will look exactly how you imagined it.",
   how_it_works_heading: 'How It Works',
   how_it_works_subheading: "Renting decorations should be simple. Here's our straightforward process.",
+  contact_heading: 'Get in Touch',
+  contact_subheading: 'Questions about rentals, custom requests, or just want to say hello?',
+  contact_intro_heading: "We'd love to hear from you",
+  contact_intro_text: "Whether you're planning a wedding, have a question about a specific rental, or want to discuss a custom setup, we're here to help. We typically respond within 24 hours.",
+  rentals_eyebrow: 'Decoration Rentals',
+  rentals_heading: 'Rent the Perfect Setting',
+  rentals_subheading: 'Choose from our collection of floral arches, backdrops, benches, and more.',
+  shop_eyebrow: 'Wedding Shop',
+  shop_heading: 'Keepsakes & Personalized Gifts',
+  shop_subheading: 'Personalized glasses, ring boxes, and hand-crafted bouquets — yours to keep long after the big day.',
 };
 
 const SiteSettingsContext = createContext<SiteSettings>(DEFAULT_SETTINGS);

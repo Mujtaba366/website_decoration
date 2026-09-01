@@ -8,11 +8,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Mail, Phone, MapPin, Instagram, Send } from 'lucide-react';
+import { Mail, Phone, MapPin, Instagram, Send, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ContactPage() {
-  const { support_email, phone, location, instagram_handle } = useSiteSettings();
+  const {
+    support_email, phone, location, instagram_handle, business_hours,
+    contact_heading, contact_subheading, contact_intro_heading, contact_intro_text,
+  } = useSiteSettings();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [subject, setSubject] = useState('');
@@ -53,10 +56,10 @@ export default function ContactPage() {
         <div className="absolute inset-0 bg-sage-900/50" />
         <div className="relative z-10 h-full flex flex-col items-center justify-center text-center px-4">
           <h1 className="font-serif text-5xl md:text-6xl font-semibold text-white text-balance">
-            Get in Touch
+            {contact_heading}
           </h1>
           <p className="mt-4 text-lg text-white/80 max-w-xl">
-            Questions about rentals, custom requests, or just want to say hello?
+            {contact_subheading}
           </p>
         </div>
       </section>
@@ -66,12 +69,10 @@ export default function ContactPage() {
           {/* Contact info */}
           <div>
             <h2 className="font-serif text-3xl font-semibold text-sage-800 mb-6">
-              We&apos;d love to hear from you
+              {contact_intro_heading}
             </h2>
             <p className="text-muted-foreground leading-relaxed mb-8">
-              Whether you&apos;re planning a wedding, have a question about a specific
-              rental, or want to discuss a custom setup, we&apos;re here to help.
-              We typically respond within 24 hours.
+              {contact_intro_text}
             </p>
 
             <div className="space-y-4">
@@ -80,6 +81,7 @@ export default function ContactPage() {
                 { icon: Phone, label: 'Phone', value: phone },
                 { icon: MapPin, label: 'Location', value: location },
                 { icon: Instagram, label: 'Instagram', value: instagram_handle },
+                { icon: Clock, label: 'Hours', value: business_hours },
               ].filter((item) => item.value).map((item, i) => (
                 <div key={i} className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-full bg-sage-100 flex items-center justify-center flex-shrink-0">

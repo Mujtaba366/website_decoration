@@ -9,10 +9,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useSiteSettings } from '@/components/site-settings-context';
 
 const shopCategories = ['Glassware', 'Keepsakes', 'Florals'];
 
 export default function ShopPage() {
+  const { shop_eyebrow, shop_heading, shop_subheading } = useSiteSettings();
   const { data: allProducts = [], loading } = useApi(() => productsAPI.list(), []);
   const [selectedCats, setSelectedCats] = useState<string[]>([]);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 500]);
@@ -38,14 +40,13 @@ export default function ShopPage() {
     <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
       <div className="text-center mb-10">
         <p className="text-blush-600 text-sm font-medium tracking-[0.2em] uppercase mb-3">
-          Wedding Shop
+          {shop_eyebrow}
         </p>
         <h1 className="font-serif text-4xl md:text-5xl font-semibold text-sage-800">
-          Keepsakes &amp; Personalized Gifts
+          {shop_heading}
         </h1>
         <p className="mt-4 text-muted-foreground max-w-xl mx-auto">
-          Personalized glasses, ring boxes, and hand-crafted bouquets —
-          yours to keep long after the big day.
+          {shop_subheading}
         </p>
       </div>
 
