@@ -6,14 +6,20 @@ This file is a chronological log of unattended work sessions on this repo, most
 recent first. It grew organically across several sessions rather than being
 written as one document, so here's the map:
 
-- **This "Start here" section** - what's below, and the final prioritized
+- **This "Start here" section** - what's below, and the current prioritized
   recommendations (read this first).
+- **"Round five"** - the payments round: fixed the unauthenticated debug
+  endpoint (approved to act on `SECURITY_DEBT.md` item 4 for the first time),
+  added cancel/delete for bookings and orders, product image upload to
+  Supabase Storage, a thorough sweep making the rest of the site's
+  business-specific copy DB-editable, and bank transfer + Stripe payment
+  settings built on a new public/admin-only data split.
 - **"Side request, mid-round-three"** - a one-off task (deleted
   `backend/.env.example`), not part of the numbered round work.
 - **"Round four"** - the closing round: finished the `service_area_note` bug
   class sweep with regression tests, confirmed the admin mobile fix from round
   three still holds, added frontend test coverage for the booking/calendar
-  logic, and this handover (this file + the root `README.md`).
+  logic, and a handover (this file + the root `README.md`).
 - **"Round three"** - found and fixed two real bugs by re-testing round two's
   own claimed fixes empirically (a stale-password-check bug, and every admin
   endpoint downgrading clean 400s into 500s), fixed a real mobile usability
@@ -26,13 +32,15 @@ written as one document, so here's the map:
   DB-editable for the first time.
 
 **Current state**: tree builds clean (`npm run build` in `frontend/`), both test
-suites pass (58 backend tests via `unittest`, 16 frontend tests via
+suites pass (99 backend tests via `unittest`, 16 frontend tests via
 `node --test`, zero new dependencies for either), and the Supabase database is
-at the exact same row counts it started this whole engagement at - every piece
-of test data created during any verification pass across every round was
-deleted or reverted immediately after confirming it worked. Nothing is
-mid-edit. Everything is committed locally; nothing has ever been pushed
-anywhere.
+at the same row counts it started this engagement at, plus one new table
+(`payment_settings`, singleton row) and 13 new nullable/defaulted columns on
+`site_settings` from round five - every piece of test data created during any
+verification pass across every round (including round five's live end-to-end
+checks against the real Supabase project and a real admin login) was deleted
+or reverted immediately after confirming it worked. Nothing is mid-edit.
+Everything is committed locally; nothing has ever been pushed anywhere.
 
 ## Recommended next steps, prioritized
 
@@ -42,33 +50,18 @@ something would be over-engineering for what this site actually needs, I've
 said so rather than padding the list.
 
 **Do soon - small effort, no real downside:**
-1. **Fix the unauthenticated `/api/admin/debug/sessions` endpoint**
-   (`SECURITY_DEBT.md` item 4). It leaks live session tokens and admin
-   usernames to anyone who can reach the backend, no login required. This is a
-   five-minute fix (delete the route, or add the same auth check every other
-   admin route already has) with zero design tradeoffs - unlike the RLS
-   question below, there's no reason to leave this one. Not touched all
-   engagement per the "don't act on SECURITY_DEBT.md" instruction - flagging
-   it as the one item on that list I'd actually just fix.
-2. **Add delete/cancel buttons for bookings and orders in the admin UI.** The
-   backend already supports it (`DELETE /api/bookings/<id>`,
-   `DELETE /api/orders/<id>`) but nothing in `/admin` exposes it - today,
-   removing a spam or test booking means going into Supabase directly. Small,
-   contained UI change (a button + confirm dialog, matching the pattern
-   already used for product delete and calendar unblock).
-
-**Worth doing once it starts to matter - medium effort:**
-3. **Let the admin upload product images instead of pasting a URL.** Right
-   now "Image URL" in the product form means finding somewhere else to host
-   the photo first. Supabase has built-in file storage - wiring that up would
-   be a genuine day-to-day quality-of-life improvement for whoever's adding
-   new rental items regularly. Medium effort (new Supabase Storage bucket +
-   an upload endpoint + a file input in the admin form) but no architectural
-   risk.
-4. **Rate-limit the admin login endpoint** before this is ever reachable from
+1. **Paste in real Stripe credentials once a Stripe account exists.**
+   `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` in `backend/.env` (see that
+   file's README for exactly what goes where and how to get them), then turn
+   on "Offer card payment at checkout" and paste the publishable key in
+   Admin → Settings → Payment Settings. Until then card payment correctly
+   stays unavailable rather than erroring - this has been verified, not just
+   assumed (see round five below). This is the one remaining piece of the
+   payments work that a developer, not this engagement, has to finish.
+2. **Rate-limit the admin login endpoint** before this is ever reachable from
    the open internet (it currently isn't - local only). Small effort, clear
    value the moment this gets a real deployment.
-5. **Verify the Auckland postcode range** (`frontend/lib/date-utils.ts`,
+3. **Verify the Auckland postcode range** (`frontend/lib/date-utils.ts`,
    flagged repeatedly and never fixed - needs an authoritative NZ
    postcode-to-region source I couldn't reach under this engagement's
    no-external-network-calls rule). This affects real delivery-fee logic, so
@@ -76,38 +69,193 @@ said so rather than padding the list.
    ever matters for an actual out-of-area booking.
 
 **Real projects - only worth it once the business genuinely needs them:**
-6. **RLS/auth hardening** (`SECURITY_DEBT.md` items 1-2 - every table is
-   writable by anyone with the Supabase anon key, independent of the Flask
-   admin-token layer). This matters a lot *before* this site gets meaningful
-   public traffic, and very little before that. It's also a real project, not
-   a patch - it needs either moving all admin writes to a service-role key
-   with RLS locked down for everyone else, or real Supabase Auth for admins.
-   Don't do this speculatively; do it when a real launch is actually being
-   planned.
-7. **Real payment processing** (Stripe or similar). The current flow - place
-   an order, get a manual follow-up with payment details - may just be how a
-   2-person business wants to operate indefinitely. I'd treat automating this
-   as solving a problem only once manual follow-up actually becomes a
-   bottleneck, not before.
+4. **RLS/auth hardening** (`SECURITY_DEBT.md` items 1-2 - every table except
+   the new `payment_settings` is writable by anyone with the Supabase anon
+   key, independent of the Flask admin-token layer). This matters a lot
+   *before* this site gets meaningful public traffic, and very little before
+   that. It's also a real project, not a patch - it needs either moving all
+   admin writes to a service-role key with RLS locked down for everyone else,
+   or real Supabase Auth for admins. `payment_settings` (round five) is now a
+   working example of that target pattern already in production use, if this
+   is ever tackled. Don't do this speculatively; do it when a real launch is
+   actually being planned.
+5. **A webhook secret and a live Stripe account, once real transaction volume
+   justifies automating reconciliation.** Right now, even once Stripe is
+   configured, marking an order paid still depends on the webhook actually
+   firing and the secret being set - it's real but minimal, not a full
+   payments ops setup (no refund handling, no partial payments, no retry UI).
+   Worth revisiting once payment volume makes manual reconciliation painful.
 
 **Probably not worth doing at all, for a site this size:**
-8. **A full CMS / page-builder for every piece of copy.** Three page heroes
-   (Home, About, How It Works) plus the header/footer/contact info are now
-   DB-editable, which covers the content that's actually likely to change
-   (business name, contact details, headline messaging). Making the "Values"
-   grid, the 4-step process list, and every other static paragraph editable
-   too would mean building real CMS infrastructure to solve a problem this
-   business probably doesn't have - editing a `.tsx` file directly for copy
-   that changes once a year is genuinely fine.
-9. **True Postgres-transaction atomicity for booking creation** (noted
+6. **Making every remaining piece of generic marketing copy DB-editable**
+   (the homepage feature-highlight cards, the how-it-works step cards, the
+   about-page "values" grid). Round five deliberately drew the line at page
+   heroes/intros and business facts (contact info, hours, bank details) and
+   left generic design copy alone - editing a `.tsx` file directly for
+   marketing copy that changes rarely is genuinely fine, and an admin settings
+   page with fields for every card on every page would become unusable.
+7. **True Postgres-transaction atomicity for booking creation** (noted
    repeatedly as deferred - the current "claim the date, then create the
    booking, roll back on failure" approach closes the actual race condition
    but isn't one atomic database transaction). This would only matter at a
    booking volume this business is unlikely to reach - two customers
    racing to book the exact literal same millisecond is not a real risk here.
-10. **CI, admin roles/permissions, multi-admin support.** No remote, no
-    collaborators, one admin user. Building any of this now would be solving
-    problems that don't exist yet.
+8. **CI, admin roles/permissions, multi-admin support.** No remote, no
+   collaborators, one admin user. Building any of this now would be solving
+   problems that don't exist yet.
+
+---
+
+## Round five (payments round)
+
+Trigger: Mujtaba's instruction that "the eventual owner should be able to change
+anything business-specific themselves, without a developer" - a larger round
+covering admin delete/cancel actions, product image upload, a full content sweep,
+and bank transfer + Stripe payment settings. Standing rules unchanged (local
+commits only, no push/deploy, additive DB changes only, no new installs, don't act
+on the rest of `SECURITY_DEBT.md`). One explicit new authorization: fix the
+unauthenticated `debug/sessions` endpoint first, since leaking admin session
+tokens right next to new payment config was judged unacceptable to leave any
+longer.
+
+**1. Fixed `GET /api/admin/debug/sessions`** (`SECURITY_DEBT.md` item 4, the one
+item on that list explicitly approved to act on this round). It had no auth check
+at all and returned live session tokens and admin usernames to anyone who could
+reach the backend. Now requires a valid admin token and returns only a session
+count - no tokens or usernames even to an authenticated caller. Regression tests
+in `test_admin_auth.py::DebugSessionsTests`.
+
+**2. Cancel/delete for bookings and orders in the admin UI.** The backend already
+had public, unauthenticated `DELETE` endpoints for both - the actual gap was no
+admin-gated version and no UI. Added `'cancelled'` to `bookings.status`'s CHECK
+constraint (additive - existing rows untouched; `orders.status` already allowed
+it). Cancelling a booking or deleting it both release its `blocked_dates` row, so
+the date opens back up on the global calendar - this was the one behavior that
+had to be new logic, not just UI wiring, since the existing generic
+`update_admin_booking` PUT never touched the calendar. New admin-gated
+`DELETE /api/admin/bookings/<id>` and `DELETE /api/admin/orders/<id>`, so the
+admin UI no longer needs to fall back to the unauthenticated public routes.
+Cancel (soft, keeps the record) is the primary action in the UI; Delete (hard,
+with a stronger confirm) is offered alongside it for removing test/duplicate
+entries entirely - both destructive actions confirm before running.
+
+**3. Product image upload to Supabase Storage.** Created a public
+`product-images` bucket (5MB limit, image MIME types only, enforced at both the
+bucket level and in the new upload endpoint) via a migration - Storage buckets
+are just rows in `storage.buckets`/`storage.objects`, so this needed no new
+tooling. New `SupabaseClient.upload_file()` method uploads via a raw REST call to
+Supabase's Storage API (no `supabase-py`/`storage3` dependency, matching the rest
+of this hand-rolled client). Admin products page now uploads a real file - both
+the "Add Product" form and, importantly, the inline edit row, which previously
+had no way to change a product's image at all despite `editData.image` existing
+in state (an editable-but-disconnected gap of the same shape as the
+`service_area_note` bug from round three, just never hit because no UI exposed
+it). Verified end-to-end against the real Supabase project: uploaded a real file
+through the live endpoint, confirmed the returned public URL actually served the
+image back, then cleaned up the test object.
+
+**4. Content sweep** - the highest-value item per the request, done thoroughly. An
+Explore-agent pass across every page found: the Contact page's hero and intro
+text were hardcoded, business hours didn't exist anywhere on the site at all, the
+homepage CTA banner and the Rentals/Shop page hero blocks were hardcoded, and the
+footer's bottom line ("Made with care in Auckland, Aotearoa") was hardcoded
+separately from the already-editable `tagline` field. Added 13 new
+nullable/defaulted `site_settings` columns (backfilled on the existing row to
+match the current hardcoded text exactly, so nothing changed visually until an
+admin edits something) and wired all of it through - contact page, homepage CTA,
+rentals/shop hero blocks, footer note, and a genuinely new `business_hours` field
+(shown in the footer and on Contact, hidden entirely rather than showing a
+made-up default when left blank). Every new field was added to both the frontend
+form and the backend `SETTINGS_FIELDS` whitelist together, with
+`test_admin_settings.py`'s `FRONTEND_FORM_FIELDS` list extended to match - the
+exact discipline round three's `service_area_note` postmortem called for, so this
+round doesn't reproduce that bug class with 13 new fields.
+
+Also fixed, found in the same sweep: the site's social-share preview image
+(`openGraph`/`twitter` metadata in `frontend/app/layout.tsx`) pointed at a
+`bolt.new` placeholder image left over from scaffolding, not anything belonging
+to this business. Replaced with the same hero photo already used on the
+homepage.
+
+**Deliberately NOT made editable** (a judgment call, logged here rather than
+silently decided): the homepage feature-highlight cards, the how-it-works step
+cards, and the about-page "values" grid. These read as generic design/marketing
+copy rather than business facts a new owner would need to change day-to-day -
+making every card on every page admin-editable would mean building real CMS
+infrastructure and an unusably long settings form to solve a problem this
+business likely doesn't have. Listed in the recommendations above if this
+judgment call is ever worth revisiting.
+
+**5. Bank transfer + Stripe payment settings - the security-sensitive centerpiece
+of this round.** The request was explicit and non-negotiable: the Stripe secret
+key must never be stored in the database or admin-editable (this project has
+fully open RLS everywhere and a plaintext admin password - a secret key in
+`site_settings` would be readable by anyone with the anon key), and the bank
+account number is business-identifying data that shouldn't sit in a table the
+anon key can read wholesale.
+
+The judgment call this required: how to have a table that's genuinely unreadable
+by the anon key while still being usable by backend admin endpoints, given the
+backend authenticates to Supabase with the anon key for literally everything
+else in this project. Resolution: a new `payment_settings` table (bank account
+number/name, Stripe's non-secret config - publishable key, currency, enabled
+toggles, success/cancel URLs) with RLS **enabled and given no
+anon/authenticated policy at all** - a deliberate, first-of-its-kind departure
+from this project's "everything open" RLS convention, done narrowly for this one
+sensitive table rather than as a general fix. Backend access goes through a new
+`get_supabase_admin_client()` (the service-role key, which bypasses RLS - it was
+already sitting in `.env` unused, documented as "reserved for future" since
+round one, and this is that future). I verified this actually works as intended
+by querying the live Supabase project directly with both keys: the anon key gets
+`[]` back from `payment_settings`, the service-role key gets the real row.
+Public access goes through a new, narrow `GET /api/payment-config` endpoint that
+returns only the specific fields checkout needs (including the bank account
+number itself, deliberately - customers need to see it to pay by transfer) -
+never a blanket dump of the row, and never the admin-only success/cancel URL
+fields.
+
+Stripe integration is built entirely on raw REST calls via `requests` - no
+`stripe` PyPI package, since installing one would violate "no new installs" just
+as much as an npm package would. Checkout session creation
+(`POST /api/checkout/stripe-session`) and webhook signature verification
+(`POST /api/webhooks/stripe`) are both hand-implemented against Stripe's
+documented API/HMAC scheme, the same pattern this backend already uses for
+Supabase itself. Both are guarded for the fact that no real Stripe credentials
+exist: `is_stripe_configured()` checks that `STRIPE_SECRET_KEY` actually starts
+with `sk_` rather than just checking it's set, specifically because
+`backend/.env` ships with a `your-stripe-secret-key`-style placeholder that
+would otherwise read as "configured" and send a real API call out with a bogus
+key. Without a real key, checkout correctly returns 503 rather than crashing or
+erroring oddly. Without `STRIPE_WEBHOOK_SECRET` set, the webhook endpoint
+acknowledges requests but deliberately does nothing else - it never marks an
+order paid from an unverifiable payload, since that would be a free way to fake
+a successful payment; this was a conservative choice I made rather than
+defaulting to "trust it anyway," per the standing "choose the conservative
+option on judgment calls" instruction.
+
+**What was actually verified vs. what's blocked pending credentials:** the full
+non-Stripe-API parts of this were verified end-to-end against the real project -
+admin-set bank details appearing correctly on the live cart page, the Stripe
+toggle correctly showing/hiding the card payment option, and a real checkout
+attempt (with the placeholder secret key) correctly failing closed with a 503
+while preserving the order and cart rather than losing them. The webhook
+signature verification logic is fully unit-tested with a synthetic secret
+(valid signature accepted, wrong secret/tampered payload/stale timestamp all
+rejected, malformed header doesn't crash) - this doesn't need a real Stripe
+account to test correctly, since it's just HMAC-SHA256 either way. What's
+genuinely blocked: an actual successful payment through Stripe's real API (would
+need a live or test-mode Stripe account, which doesn't exist), and receiving a
+real webhook from Stripe's servers (same reason). Both are pieces a developer
+needs to complete once Mujtaba/the eventual owner has a Stripe account - exactly
+which env vars to paste where is documented in `backend/README.md`.
+
+Test suite grew from 72 to 99 backend tests this round (bookings/orders
+cancel-delete, image upload validation, the new settings fields' round-trip,
+payment config's public/admin field split, Stripe's configured-check and
+checkout-session logic with the Stripe API call itself mocked, and the full
+webhook signature verification suite). All passing; frontend build clean;
+`SECURITY_DEBT.md` updated to reflect item 4 as fixed and to document the new
+`payment_settings` table as a deliberate, one-off exception to item 1.
 
 ---
 

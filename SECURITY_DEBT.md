@@ -85,25 +85,24 @@ live DB password is changed later. Worth rotating the password (in the DB, not b
 editing the old migration) before ever making this repo non-local, since by then it's
 not really a "development password" anymore.
 
-## 4. Unauthenticated debug endpoint leaks live session tokens
+## 4. Unauthenticated debug endpoint leaks live session tokens — FIXED
 
-`GET /api/admin/debug/sessions` (`backend/api/admin_views.py:debug_sessions`) has
-**no authentication check at all** and returns:
-- the count of active admin sessions,
-- the first 5 actual session tokens (not hashed - the literal bearer tokens, usable
-  to impersonate whoever holds those sessions),
-- the list of admin usernames.
+**Status: fixed** (payments round - see `OVERNIGHT_NOTES.md`). Explicitly approved
+for this round: adding payment config right next to an unauthenticated token leak was
+judged unacceptable, so this was done first, ahead of everything else in that round.
 
-This is worse than #2 in one specific way: it doesn't even require the Supabase anon
-key, just network access to the Flask backend. Anyone who can reach
-`/api/admin/debug/sessions` can grab a live admin token and use it immediately - no
-password needed at all, admin_users table irrelevant.
+`GET /api/admin/debug/sessions` (`backend/api/admin_views.py:debug_sessions`) used to
+have **no authentication check at all** and returned the count of active admin
+sessions, the first 5 actual session tokens (not hashed - the literal bearer tokens,
+usable to impersonate whoever holds those sessions), and the list of admin usernames.
+It's worse than #2 in one specific way: it didn't even require the Supabase anon key,
+just network access to the Flask backend.
 
-This reads as a debugging leftover (the name and docstring say as much) rather than
-an intentional design choice, unlike #3. Flagging it as the single highest-value fix
-whenever this list gets acted on - deleting the route or gating it behind
-`verify_admin_token` is a five-minute change with no side effects, unlike #1/#2 which
-need real design work. **Not touched tonight** per the "document, don't act" instruction.
+Now requires a valid admin bearer token (same `verify_admin_token` check every other
+admin endpoint uses) and only returns the session count - no tokens, no usernames,
+even to an authenticated caller, since there's no legitimate reason to hand a session
+token out a second time after it was already issued at login. Covered by
+`backend/tests/test_admin_auth.py::DebugSessionsTests`.
 
 ## 5. No rate limiting on login
 
@@ -139,5 +138,20 @@ sanitized before it's staged.
   insert) - reasonable for a public storefront with no customer accounts. The problem
   is specifically the tables that *shouldn't* be open (`admin_users`, arguably
   `site_settings` writes and order/payment status), not the pattern itself everywhere.
-- No real payment processor integrated - explicitly out of scope for now per standing
-  instructions ("not launching soon... do NOT integrate a real payment processor").
+- No real payment processor integrated - was explicitly out of scope in earlier
+  rounds. A Stripe integration was added in the payments round (raw REST calls, no
+  SDK), but it has never been tested against a real Stripe account (no credentials
+  exist) and stays fully inert until real `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET`
+  values are added to `backend/.env` - see `backend/README.md`.
+
+## Note: the payment_settings table is a deliberate exception to item #1
+
+Added in the payments round: `payment_settings` (bank account number, Stripe's
+non-secret config) has RLS enabled with **no** anon/authenticated policy at all -
+verified directly against the live Supabase project that the anon key gets an empty
+result from it. Only backend code using the service-role key
+(`get_supabase_admin_client()`) can touch it. This is the one table in the project
+that does NOT follow the "everything open" pattern described in item #1, done
+narrowly for this one sensitive table rather than as a general RLS fix. If item #1 is
+ever tackled properly, this table is a working example of the target pattern
+(service-role key + locked-down RLS) already in production use.
