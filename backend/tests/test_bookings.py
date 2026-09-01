@@ -159,23 +159,42 @@ class UpdateReturns404WhenMissingTests(ApiTestCase):
     """Regression tests for a real bug found in the correctness sweep: every
     update_* view in app/view.py returned 200 with a null body for a
     nonexistent id, instead of 404 - silently "succeeding" at updating
-    something that was never found."""
+    something that was never found.
+
+    /api/bookings, /api/orders, and /api/payments now require admin auth for
+    anything but POST (a separate fix - these legacy public routes had no
+    auth check at all for GET/PUT/DELETE, unrelated to the RLS lockdown),
+    so those three now need a token to even reach the 404 check; an
+    authenticated request against a missing id still gets 404, not the
+    generic 401 an unauthenticated one gets."""
 
     def test_update_booking_not_found(self):
-        res = self.client.put('/api/bookings/does-not-exist', json={'status': 'confirmed'})
+        res = self.client.put('/api/bookings/does-not-exist', json={'status': 'confirmed'}, headers=self.auth_headers())
         self.assertEqual(res.status_code, 404)
 
+    def test_update_booking_without_auth_is_rejected(self):
+        res = self.client.put('/api/bookings/does-not-exist', json={'status': 'confirmed'})
+        self.assertEqual(res.status_code, 401)
+
     def test_update_order_not_found(self):
-        res = self.client.put('/api/orders/does-not-exist', json={'status': 'paid'})
+        res = self.client.put('/api/orders/does-not-exist', json={'status': 'paid'}, headers=self.auth_headers())
         self.assertEqual(res.status_code, 404)
+
+    def test_update_order_without_auth_is_rejected(self):
+        res = self.client.put('/api/orders/does-not-exist', json={'status': 'paid'})
+        self.assertEqual(res.status_code, 401)
 
     def test_update_product_not_found(self):
         res = self.client.put('/api/products/does-not-exist', json={'name': 'x'})
         self.assertEqual(res.status_code, 404)
 
     def test_update_payment_not_found(self):
-        res = self.client.put('/api/payments/does-not-exist', json={'status': 'paid'})
+        res = self.client.put('/api/payments/does-not-exist', json={'status': 'paid'}, headers=self.auth_headers())
         self.assertEqual(res.status_code, 404)
+
+    def test_update_payment_without_auth_is_rejected(self):
+        res = self.client.put('/api/payments/does-not-exist', json={'status': 'paid'})
+        self.assertEqual(res.status_code, 401)
 
     def test_update_availability_not_found(self):
         res = self.client.put('/api/availability/does-not-exist', json={'is_available': False})

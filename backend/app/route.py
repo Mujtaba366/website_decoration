@@ -7,7 +7,7 @@ from app.view import (
     get_messages, create_message, delete_message,
     get_payments, create_payment, update_payment, delete_payment
 )
-from api.admin_views import admin_login, admin_logout, admin_verify, admin_change_password, debug_sessions
+from api.admin_views import admin_login, admin_logout, admin_verify, admin_change_password, debug_sessions, verify_admin_token
 from api.admin_dashboard import (
     get_dashboard_stats,
     get_products as get_admin_products,
@@ -28,6 +28,28 @@ from api.admin_orders import get_admin_orders, update_admin_order, delete_admin_
 from api.admin_uploads import upload_product_image
 from api.payment_settings import get_payment_config, get_admin_payment_settings, update_payment_settings
 from api.stripe_payments import create_checkout_session, stripe_webhook
+
+def _admin_authorized():
+    """Shared guard for the legacy public /api/{bookings,orders,messages,
+    payments} routes below. Their POST (create) is genuinely public -
+    customers create their own bookings/orders/messages/payments - but
+    GET/PUT/DELETE on these were found to have no auth check at all,
+    exposing every customer's name/contact/order contents and letting
+    anyone delete or edit any record, unauthenticated, independent of the
+    RLS lockdown (this is a Flask-layer gap, not a Supabase one). Confirmed
+    via grep that the frontend never calls these methods on these routes -
+    only POST is ever used - so gating them here is a pure security fix
+    with no functional risk to the live site. The already-admin-gated
+    /api/admin/* equivalents (added in earlier rounds) are what the admin
+    UI actually uses; these routes are kept only because removing them
+    outright was more change than asked for."""
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        return False
+    token = auth_header[7:]
+    is_valid, _ = verify_admin_token(token)
+    return is_valid
+
 
 def register_routes(app):
     # ==================== ADMIN AUTHENTICATION ====================
@@ -178,10 +200,14 @@ def register_routes(app):
     def bookings_list():
         if request.method == 'POST':
             return create_booking(request.get_json(silent=True))
+        if not _admin_authorized():
+            return jsonify({'error': 'Unauthorized'}), 401
         return get_bookings()
 
     @app.route('/api/bookings/<booking_id>', methods=['GET', 'PUT', 'DELETE'])
     def bookings_detail(booking_id):
+        if not _admin_authorized():
+            return jsonify({'error': 'Unauthorized'}), 401
         if request.method == 'PUT':
             return update_booking(booking_id, request.get_json(silent=True))
         elif request.method == 'DELETE':
@@ -208,10 +234,14 @@ def register_routes(app):
     def orders_list():
         if request.method == 'POST':
             return create_order(request.get_json(silent=True))
+        if not _admin_authorized():
+            return jsonify({'error': 'Unauthorized'}), 401
         return get_orders()
 
     @app.route('/api/orders/<order_id>', methods=['GET', 'PUT', 'DELETE'])
     def orders_detail(order_id):
+        if not _admin_authorized():
+            return jsonify({'error': 'Unauthorized'}), 401
         if request.method == 'PUT':
             return update_order(order_id, request.get_json(silent=True))
         elif request.method == 'DELETE':
@@ -223,10 +253,14 @@ def register_routes(app):
     def messages_list():
         if request.method == 'POST':
             return create_message(request.get_json(silent=True))
+        if not _admin_authorized():
+            return jsonify({'error': 'Unauthorized'}), 401
         return get_messages()
 
     @app.route('/api/messages/<message_id>', methods=['GET', 'DELETE'])
     def messages_detail(message_id):
+        if not _admin_authorized():
+            return jsonify({'error': 'Unauthorized'}), 401
         if request.method == 'DELETE':
             return delete_message(message_id)
         return get_messages(message_id)
@@ -236,10 +270,14 @@ def register_routes(app):
     def payments_list():
         if request.method == 'POST':
             return create_payment(request.get_json(silent=True))
+        if not _admin_authorized():
+            return jsonify({'error': 'Unauthorized'}), 401
         return get_payments()
 
     @app.route('/api/payments/<payment_id>', methods=['GET', 'PUT', 'DELETE'])
     def payments_detail(payment_id):
+        if not _admin_authorized():
+            return jsonify({'error': 'Unauthorized'}), 401
         if request.method == 'PUT':
             return update_payment(payment_id, request.get_json(silent=True))
         elif request.method == 'DELETE':
