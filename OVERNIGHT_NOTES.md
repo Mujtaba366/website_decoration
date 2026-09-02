@@ -539,6 +539,21 @@ dict a stale worker could disagree about) but left alone on purpose - see
 `SECURITY_DEBT.md` item 9 for the reasoning on why its practical impact is
 much smaller and it's being tracked separately rather than bundled in.
 
+**Confirmed fixed on the live site itself**, not just locally - explicitly
+asked for, since local dev never reproduced the bug in the first place (a
+single dev process can't). After Render finished deploying: logged in
+against the real backend and hit `/api/admin/dashboard/stats` and
+`/api/admin/orders` - the exact sequence from the original bug report - 29
+times in a row (58 requests total), zero 401s, which is enough samples that
+if any of the 4 workers still had a stale/inconsistent view it would very
+likely have shown up. Also loaded the actual admin UI pages (not just raw
+API calls) in a fresh browser session against the live frontend - dashboard
+and orders both rendered real data with no "Unauthorized" anywhere.
+Re-verified the anon key against `admin_sessions` directly against the live
+project (not re-asserted from memory): `SELECT` still returns `[]`, `INSERT`
+still gets a 401 RLS violation. Logged out and confirmed the table empty (0
+rows) afterward, both via the API flow and the browser flow.
+
 ---
 
 ## Round five (payments round)
