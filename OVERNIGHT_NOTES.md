@@ -439,15 +439,28 @@ whitespace still matches correctly, and a genuinely mismatched origin gets a
 future change can't reintroduce it without a test noticing). Both fixes
 pushed (`be53ec0`).
 
-**What Mujtaba still needs to do in Render's dashboard** (can't be fixed by
-code alone): set the backend service's `CORS_ORIGINS` to the real frontend
-URL, `https://website-decoration.onrender.com` (exact scheme + host, trailing
-slash no longer matters after this fix, but the host itself must be right -
-copying the local `.env` value across was the root cause here). No frontend
-rebuild is needed - `NEXT_PUBLIC_API_URL` was already confirmed correct.
-Render should pick up `be53ec0` automatically if auto-deploy is on; if the
-health check path isn't already applied from `render.yaml`, set it manually
-under the backend service's Settings once, matching the note above.
+**Confirmed live and fixed, not just deployed-and-assumed-working.** Once
+`be53ec0` rolled out, re-ran the same live diagnostics: `GET /` on the real
+backend now returns 200 (was 404), and the OPTIONS preflight for
+`/api/settings`, `/api/products`, and `/api/admin/login/` with the real
+frontend's Origin now all come back with the correct
+`Access-Control-Allow-Origin` header (15/15 rapid-fire attempts, no
+flakiness). Loaded the live site in a fresh browser tab (no leftover state
+from earlier testing) and confirmed zero console errors, real product data
+rendering (there's no hardcoded fallback for products - this can only mean
+the API call actually succeeded), and a manual `fetch('/api/settings')` from
+the live page returning real data. Turned out **no Render dashboard change
+was needed for CORS after all** - the deployed `CORS_ORIGINS` value already
+had the right host, it was the trailing-slash bug alone that was breaking
+the match, so the code fix alone resolved it once deployed. (One red herring
+along the way worth recording: right after the deploy, one browser tab that
+had been open across the whole debugging session still showed the old CORS
+console errors even after a hard reload - turned out to be stale
+accumulated console history from before the fix propagated, not a live
+failure; a brand-new tab showed no errors at all. Worth remembering next
+time a "still broken after the fix" report doesn't match direct
+curl/API-level checks - check for stale client-side state before assuming
+the fix didn't work.)
 
 ---
 
