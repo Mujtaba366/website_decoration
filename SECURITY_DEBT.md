@@ -180,6 +180,50 @@ correctly returns 401 without a valid admin token and succeeds with one, with no
 data actually read, modified, or deleted by the unauthenticated attempts tested
 against the real backend.
 
+## 9. Admin sessions lived in an in-process dict, breaking under multiple workers — FIXED
+
+Found in production, not in code review: the deployed Render backend runs gunicorn
+with 4 worker processes (`render.yaml`'s `-w 4`), but `backend/api/session_store.py`
+stored every session in a plain module-level `ADMIN_SESSIONS = {}` dict - private to
+whichever single worker process happened to handle a given request. Login would land
+on one worker and write the token into that worker's memory; the very next request
+could route to a different worker that had never seen it, 401ing immediately.
+Reproduced exactly by Mujtaba's production logs (login 200, then every subsequent
+admin request 401 within the same second) and confirmed by reading the code and
+`render.yaml` together before touching anything, per instruction not to fix a theory
+that hadn't been confirmed.
+
+**Status: fixed.** Sessions now live in a new `admin_sessions` Supabase table instead
+of process memory - shared by every worker, and durable across restarts, deploys, and
+cold starts, none of which the alternative considered (pinning to a single gunicorn
+worker) would have actually solved, since Render recycles processes for reasons
+having nothing to do with worker count. RLS locked down identically to
+`payment_settings`: enabled, no anon/authenticated policy at all, verified with the
+anon key afterward (`SELECT` returns `[]`, `INSERT` gets a 401 RLS violation) rather
+than assumed. Session lifetime kept at 24 hours, matching the original in-memory
+design. Verified with two genuinely separate, unrelated Python processes against the
+real Supabase project (not just gunicorn workers, which at least fork from a common
+parent) - a token created by one process verified as valid from a second process that
+never shared any memory with it, which is the exact failure mode this fixes. A
+regression test (`CrossProcessSessionTests` in `backend/tests/test_session_store.py`)
+locks this in, and was confirmed to actually fail against the old implementation
+before being trusted.
+
+**The lower-severity sibling, left alone for now:** `ADMIN_USERS` in
+`backend/api/admin_views.py` is the same shape of bug - an in-memory dict, mutated by
+`admin_change_password()`, that any given gunicorn worker might have a stale copy of.
+Not fixed in the same pass because the practical impact is much smaller:
+`admin_login()` and `admin_change_password()` both check the real `admin_users`
+Supabase table *first* and only fall back to this dict if that lookup fails, and
+(since the RLS-lockdown round's service-role-key switch) that Supabase write now
+genuinely persists. So a stale in-memory copy on some workers only matters in the
+edge case where Supabase is transiently unreachable at the exact moment of a login or
+password-change request - a real gap, but a narrow one, unlike sessions where the bug
+fired on essentially every request. Worth the same fix eventually (most likely:
+delete the fallback entirely now that Supabase reliably persists the password, rather
+than building it a session-table-style replacement) - tracked here for a separate
+pass rather than bundled into this one.
+
 ## What's *not* debt (deliberate, already-accepted tradeoffs)
 
 - Plaintext admin password (item 3) - explicit requirement, revisit only if/when the

@@ -11,9 +11,14 @@ written as one document, so here's the map:
 - **"Round seven"** - deploy-prep round: full git-history secret scan before
   the first-ever push, found the GitHub repo is public (paused for a decision
   rather than pushing), and reconciled `render.yaml` with the service-role
-  key migration. Surfacing Stripe payment/receipt data in the admin panel
+  key migration. Also two production incidents found and fixed post-deploy:
+  a CORS/health-check pair (Mujtaba ended up fixing the CORS half himself
+  in the dashboard; the health-check fix and a defensive CORS-parsing
+  improvement were still pushed), and admin sessions breaking under
+  gunicorn's multiple worker processes (moved from an in-memory dict to a
+  Supabase table). Surfacing Stripe payment/receipt data in the admin panel
   (the second half of round six's ask) is still outstanding - paused when
-  this deploy request came in, not forgotten.
+  the deploy work came in, not forgotten.
 - **"Round six"** - the RLS lockdown round: switched the backend to the
   service-role key and locked Row Level Security down on every table
   (`SECURITY_DEBT.md` items 1 and 2, explicitly approved this round,
@@ -44,13 +49,15 @@ written as one document, so here's the map:
   DB-editable for the first time.
 
 **Current state**: tree builds clean (`npm run build` in `frontend/`), both test
-suites pass (109 backend tests via `unittest`, 16 frontend tests via
+suites pass (123 backend tests via `unittest`, 16 frontend tests via
 `node --test`, zero new dependencies for either), and the Supabase database is
-at the same row counts it started this engagement at, plus one new table
-(`payment_settings`, singleton row) and 13 new nullable/defaulted columns on
-`site_settings` from round five - every piece of test data created during any
-verification pass across every round (including round five and six's live
-end-to-end checks against the real Supabase project and a real admin login)
+at the same row counts it started this engagement at, plus two new tables
+(`payment_settings`, singleton row, from round five; `admin_sessions`, kept
+empty between logins, from round seven) and 13 new nullable/defaulted
+columns on `site_settings` from round five - every piece of test data
+created during any verification pass across every round (including round
+five, six, and seven's live end-to-end checks against the real Supabase
+project and a real admin login)
 was deleted or reverted immediately after confirming it worked. As of round
 six, the backend authenticates to Supabase with the service-role key and every
 table's RLS is locked down (zero anon access on sensitive tables, anon-SELECT-
@@ -461,6 +468,76 @@ failure; a brand-new tab showed no errors at all. Worth remembering next
 time a "still broken after the fix" report doesn't match direct
 curl/API-level checks - check for stale client-side state before assuming
 the fix didn't work.)
+
+**Third production incident, same round: admin login succeeded, every
+subsequent admin request 401'd.** Mujtaba's logs showed login returning 200
+and then `/api/admin/orders`/`/api/admin/dashboard/stats` both 401ing
+within the same second, with CORS preflights already fine. His own
+hypothesis (relayed, and confirmed correct before anything was touched, per
+the explicit instruction not to fix an unconfirmed theory): sessions lived
+in `backend/api/session_store.py`'s `ADMIN_SESSIONS = {}`, a plain
+module-level dict private to whichever process created it, while
+`render.yaml`'s start command runs gunicorn with `-w 4` - four separate OS
+worker processes, each with its own copy of that dict. Login landing on one
+worker and the next request routing to another exactly reproduces the
+reported pattern; local dev only ever ran a single process, so it could
+never have reproduced this.
+
+Two options were on the table: pin gunicorn to one worker (one-line,
+immediate, but caps throughput and - the real problem with it - still loses
+every session on any restart, deploy, or Render's own idle-based cold
+starts, none of which have anything to do with worker count) versus a
+durable Supabase-backed session store (more work, touches the DB, but
+actually survives all of that). Recommended the durable fix given Mujtaba's
+about to demo the admin panel to a real client - argued the single-worker
+pin doesn't actually solve the underlying fragility, just makes it rarer.
+Approved.
+
+**What changed:** new `admin_sessions` table (token, session_id, admin_id,
+username, created_at, expires_at), RLS enabled with no anon/authenticated
+policy at all - same treatment as `payment_settings`, since a live session
+token is password-equivalent. Verified with the anon key afterward, not
+assumed: `SELECT` returns `[]`, `INSERT` gets a 401 RLS violation.
+`session_store.py` was rewritten behind its original five function
+signatures (`create_session`, `get_session`, `delete_session`,
+`verify_session`, `get_all_sessions`) so nothing else in the codebase
+changed at all. Session lifetime kept at **24 hours**, unchanged from the
+original design - reasonable for a single-admin tool, and now actually
+honored across restarts rather than being aspirational. Expired rows are
+cleaned up opportunistically inside `create_session()` (a best-effort
+delete-where-expired before every login) rather than needing new cron
+infrastructure this app doesn't have. Every function fails closed on a
+Supabase error (returns "invalid"/`None`/`False`/`{}` as appropriate) -
+explicitly never fails open (treating an unreachable Supabase as "session
+valid," which would be a real vulnerability) and never crashes the request
+with a 500 - a transient outage costs the admin one extra login, not a
+permanent lockout, since the very next call tries Supabase fresh.
+
+**Verification, in order of how convincing it is:** a new
+`CrossProcessSessionTests` regression test creates a session, then reloads
+the `session_store` module (which re-executes it from scratch, wiping any
+state that used to live in a module-level global exactly as a fresh worker
+process starting up would) and confirms the token is still valid afterward
+- confirmed empirically, not just by reasoning, that this test actually
+fails against the old implementation (it doesn't even have the function
+being patched, since it never imported Supabase at all). Beyond the test
+suite: verified locally with two genuinely separate, unrelated Python
+processes against the *real* Supabase project - logged in via a running
+Flask server, then called `verify_session()` on that exact token from a
+brand-new `python -c "..."` process that never shared any memory with the
+server, and it returned `True`. This is a stronger proof than spinning up
+multiple gunicorn workers would have been (gunicorn workers at least fork
+from a common parent process; these two processes shared nothing but the
+external database) - gunicorn itself isn't installed in the local dev venv,
+so this was the more rigorous option anyway rather than a fallback. Full
+HTTP round-trip also checked (login → verify → an admin-gated endpoint →
+logout), and the `admin_sessions` table confirmed empty afterward (0 rows,
+not just "logout returned success"). 123 backend tests passing.
+
+`ADMIN_USERS` in `admin_views.py` is the same shape of bug (an in-memory
+dict a stale worker could disagree about) but left alone on purpose - see
+`SECURITY_DEBT.md` item 9 for the reasoning on why its practical impact is
+much smaller and it's being tracked separately rather than bundled in.
 
 ---
 

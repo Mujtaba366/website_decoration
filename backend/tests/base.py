@@ -37,6 +37,7 @@ PATCH_TARGETS = [
     'api.payment_settings.get_supabase_admin_client',
     'api.stripe_payments.get_supabase_client',
     'api.stripe_payments.get_supabase_admin_client',
+    'api.session_store.get_supabase_client',
 ]
 
 
@@ -50,12 +51,10 @@ class ApiTestCase(unittest.TestCase):
 
         flask_app.testing = True
         self.client = flask_app.test_client()
-
-        # session_store is a module-level dict shared by the whole process -
-        # clear it between tests so sessions from one test can't leak into
-        # another's assertions about session count/expiry.
-        from api.session_store import ADMIN_SESSIONS
-        ADMIN_SESSIONS.clear()
+        # session_store now reads/writes the admin_sessions table via the
+        # patched get_supabase_client above, so each test's fresh
+        # FakeSupabaseClient already starts with no sessions - no separate
+        # cleanup needed here the way the old in-memory dict required.
 
     def _stop_patchers(self):
         for p in self._patchers:
