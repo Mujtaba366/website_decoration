@@ -363,6 +363,92 @@ before that push ran. Local `master` and remote `main` both point at
 `0f007eb30a65b35f8d67814e0563a3a04ca75f9c` as of this writing - confirmed
 identical, not just assumed.
 
+**Sensitive-but-not-secret content scan** (asked separately, once the repo
+was confirmed public): the standout finding is that the live admin password
+(`changeme123` - still the actual, working production password, confirmed by
+logging in with it during the RLS lockdown round) is baked into the real
+migration file `supabase/migrations/001_create_admin_users.sql`, four legacy
+`ADMIN_*.md`/`.txt` design docs from early scaffolding, backend source, and
+test files - now all public. Recommended rotating the actual password
+immediately, since removing text from files later can't undo exposure that's
+already happened while public - did not rotate it myself, since the new
+password is Mujtaba's call. Everything else checked out clean: no real
+customer names/emails/phones anywhere in tracked files or history (the demo
+bookings visible in the admin panel live only in the database, never
+committed); the two placeholder-looking emails present (`admin@example.com`,
+and the business's own already-public `hello@bloomandvow.co.nz`) are both
+fine; `venv/` is confirmed untracked. Also answered: fully purging
+`SECURITY_DEBT.md` from history later (only 4 of ~70 commits touch it
+directly) would need a `git filter-repo`-style rewrite of most of the
+history plus another force-push, and even that can't retroactively un-expose
+it to anyone who already viewed the public repo - a plain future `git rm` is
+cheap but only stops it appearing in new clones going forward.
+
+**Production incident, found and fixed same round: the live deploy was
+broken twice over.** Mujtaba reported the Render deployment broken while
+local worked fine, pasted backend access logs, and asked for both symptoms
+in the logs to be investigated with real evidence, not assumptions - so
+every claim below was checked directly against the live deployed backend
+(`decoration-website.onrender.com`, confirmed via the frontend's own bundled
+JS as the real backend host - the two services' onrender.com names are
+confusingly mirror-image guesses of each other, `website-decoration` vs
+`decoration-website`, but neither URL was actually wrong).
+
+1. **CORS was silently rejecting every request.** The logs showed only
+   OPTIONS preflights (all 200) with the real GET/POST never appearing at
+   all - the tell that the browser was refusing to send the real request
+   after an unsatisfactory preflight. Curled the live backend's OPTIONS
+   response directly with the real frontend's Origin header: 200 OK, but
+   with **zero** `Access-Control-*` headers - Flask-CORS returns 200
+   regardless of whether the origin matches, and silently omits every CORS
+   header when it doesn't, which reads as "it worked" in access logs. Then
+   curled the same live backend with `Origin: http://localhost:3000` and got
+   back a complete, correct CORS response (`Access-Control-Allow-Origin:
+   http://localhost:3000`) - proving `CORS_ORIGINS` on the deployed service
+   was still effectively the local-dev default, consistent with Mujtaba
+   copying his local `.env` values into Render's dashboard verbatim rather
+   than adapting them. Fixed in `backend/web.py`: `CORS_ORIGINS` parsing now
+   trims whitespace and strips a trailing slash from each origin before
+   matching (the browser's `Origin` header never has one, so a pasted value
+   like `https://example.com/` would silently break this the same way even
+   once the host itself is correct) - verified locally that a
+   trailing-slash origin now matches correctly. Confirmed NOT a factor:
+   `NEXT_PUBLIC_API_URL` (correctly baked into the deployed frontend,
+   pointing at the real live backend) and credentials mode (this app never
+   sends cookies/credentials with requests, Bearer tokens only, so
+   Flask-CORS's default `supports_credentials=False` is fine - the
+   wildcard-plus-credentials trap doesn't apply here).
+
+2. **Render's health check was cycling the service.** The logs' `GET /`
+   returning 404 followed by "Shutting down: Master" three seconds later,
+   with a `Go-http-client` user agent, matched Render's own health-checker
+   pattern exactly. Curled `GET /` on the live backend directly and
+   confirmed a genuine 404 - the app only ever defined `/api/health`, and
+   Render's default health check path for a web service is `/`. Added a
+   root route in `backend/web.py` returning 200 (kept `/api/health`
+   alongside it, not replaced), and set `healthCheckPath: /api/health`
+   explicitly in `render.yaml` so this is configured as code going forward.
+   This alone likely explains most of the "intermittent" quality of the
+   reported breakage - a service being cycled every health-check interval
+   would produce exactly that.
+
+Regression tests added (`backend/tests/test_web_app.py`, 6 new tests): the
+root route returns 200, `CORS_ORIGINS` with a trailing slash or extra
+whitespace still matches correctly, and a genuinely mismatched origin gets a
+200 with no CORS headers at all (documenting the exact failure shape, so a
+future change can't reintroduce it without a test noticing). Both fixes
+pushed (`be53ec0`).
+
+**What Mujtaba still needs to do in Render's dashboard** (can't be fixed by
+code alone): set the backend service's `CORS_ORIGINS` to the real frontend
+URL, `https://website-decoration.onrender.com` (exact scheme + host, trailing
+slash no longer matters after this fix, but the host itself must be right -
+copying the local `.env` value across was the root cause here). No frontend
+rebuild is needed - `NEXT_PUBLIC_API_URL` was already confirmed correct.
+Render should pick up `be53ec0` automatically if auto-deploy is on; if the
+health check path isn't already applied from `render.yaml`, set it manually
+under the backend service's Settings once, matching the note above.
+
 ---
 
 ## Round five (payments round)
