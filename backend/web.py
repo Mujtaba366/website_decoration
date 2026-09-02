@@ -6,7 +6,20 @@ import os
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": os.getenv('CORS_ORIGINS', 'http://localhost:3000').split(',')}})
+
+# Trim whitespace and any trailing slash from each configured origin - the
+# browser's Origin header never has a path or trailing slash, so
+# "https://example.com/" (an easy value to paste in by accident, e.g. copied
+# from a browser address bar) would otherwise never match "https://example.com"
+# and Flask-CORS would silently omit every CORS header rather than error,
+# which looks exactly like a working 200 OPTIONS response until the browser
+# rejects it. Also drops empty entries from a trailing comma.
+_cors_origins = [
+    origin.strip().rstrip('/')
+    for origin in os.getenv('CORS_ORIGINS', 'http://localhost:3000').split(',')
+    if origin.strip()
+]
+CORS(app, resources={r"/api/*": {"origins": _cors_origins}})
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
 # Slightly above the 5MB per-image limit enforced in admin_uploads.py, to
 # leave room for multipart overhead - this is the outer guard that rejects
@@ -20,6 +33,18 @@ register_routes(app)
 @app.route('/api/health', methods=['GET'])
 def health():
     return jsonify({'status': 'ok', 'message': 'Backend is running'}), 200
+
+@app.route('/', methods=['GET'])
+def root_health():
+    # Render's default health check path for a web service is "/" unless a
+    # different one is configured. This API has no real content at "/" -
+    # before this route existed, a health check hitting "/" got the generic
+    # 404 handler below, which Render (reasonably) read as "unhealthy" and
+    # cycled the service - explaining the repeated "Shutting down: Master"
+    # restarts seen in production logs. Keep this alongside /api/health
+    # (used by anything that explicitly checks the API) rather than
+    # replacing it - either can be set as Render's health check path.
+    return jsonify({'status': 'ok'}), 200
 
 @app.errorhandler(400)
 def bad_request(error):
